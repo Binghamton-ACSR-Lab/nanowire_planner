@@ -99,7 +99,7 @@ namespace acsr {
                 auto stop = std::chrono::steady_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop-start);
                 std::cout<<"duration: " << duration.count()<<"\n";
-                if(duration.count()>Config::stopping_check){
+                if(duration.count()>Config::total_time){
                     is_running = false;
                     planner->stop();
                     break;
@@ -123,8 +123,6 @@ namespace acsr {
                     connecting_thread.join();
             }
             std::cout<<"Planner Finished\n";
-
-
 
         }
 

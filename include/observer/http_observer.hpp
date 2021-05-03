@@ -68,7 +68,7 @@ namespace acsr {
                 const ACADO::VariablesGrid& reference_path,
                 bool bidrectional,
                 bool optimization,
-                std::string stop_type,
+                //std::string stop_type,
                 double stop_value,
                 double goal_radius,
                 double step_size,

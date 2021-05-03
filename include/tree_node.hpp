@@ -228,7 +228,7 @@ namespace acsr {
          * get the children vector
          * @return
          */
-        std::list <TreeNodePtr> &getChildren() {
+        std::list <TreeNodePtr> getChildren() {
             return _children;
         }
 

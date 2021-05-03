@@ -187,7 +187,20 @@ namespace acsr {
                 }
             }
             std::ofstream out("reference_path.txt");
-            out<<states;
+            out<<std::setw(10)<<"#time";
+            int cols=states.getFirstVector().size();
+            for(auto i=0;i<cols/2;i++){
+                out<<"\tx"<<i<<"\ty"<<i;
+            }
+            out<<"\n";
+            for (auto i=0;i<states.getNumPoints();++i) {
+                out<<states.getTime(i);
+                DVector v=states.getVector(i);
+                for (auto j=0;j<cols;j++) {
+                    out<<"\t"<<v(j);
+                }
+                out<<"\n";
+            }
             out.close();
         }
 

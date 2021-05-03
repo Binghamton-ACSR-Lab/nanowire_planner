@@ -8,6 +8,7 @@
 #include <boost/filesystem.hpp>
 #include "nanowire_sst.hpp"
 #include "global_path.hpp"
+
 namespace acsr{
 
     typedef struct{
@@ -37,9 +38,36 @@ namespace acsr{
             //this->_root->setTreeNodeState(in_open_set);
             //open_map[1].insert({this->_goal,total_cost});
             //this->_goal->setTreeNodeState(in_open_set);
+            GlobalPath global_path;
+            auto nanowire_config = std::make_shared<NanowireConfig>();
+            nanowire_config->readFile("config/nanowire.cfg");
+            global_path.init(_init_state,_target_state,nanowire_config);
+            global_path.getStartTargetElectordes();
+            VariablesGrid states;
+            global_path.generateBestReferenceTrajectory(states);
+
             reference_path = std::make_shared<ReferencePath>();
             reference_path->readFile("reference_path.txt");
 
+            std::cout<<reference_path->getStates()<<std::endl;
+
+            _dynamic_system->setReferencePath(reference_path);
+
+            std::vector<double> length(_dynamic_system->getRobotCount(),0.0);
+            for(auto j=0;j<states.getNumPoints()-1;++j){
+                for(auto i=0;i<_dynamic_system->getRobotCount();++i){
+                    auto temp_length=(states(j,2*i)-states(j+1,2*i))*(states(j,2*i)-states(j+1,2*i))+
+                            (states(j,2*i+1)-states(j+1,2*i+1))*(states(j,2*i+1)-states(j+1,2*i+1));
+                    length[i]+=temp_length;
+                }
+            }
+            std::vector<std::pair<int,double>> length_with_index;
+            for(auto i=0;i<length.size();++i)
+                length_with_index.push_back({i,length[i]});
+            std::sort(length_with_index.begin(),length_with_index.end(),[](const auto& p1,const auto& p2){
+                return p1.second>p2.second;
+            });
+            _dynamic_system->setDominantIndex({length_with_index[0].first,length_with_index[1].first});
         }
 
         /***
@@ -51,13 +79,13 @@ namespace acsr{
         bool searchSelection(TreeId tree_id, TreeNodePtr& parent){
 
             //auto& other_tree = tree_id==TreeId::forward?reverse_tree:forward_tree;
-            auto other_tree_id = tree_id==TreeId::forward?TreeId::reverse:TreeId::forward;
+            //auto other_tree_id = tree_id==TreeId::forward?TreeId::reverse:TreeId::forward;
             std::uniform_real_distribution<double> distribution(0.0,1.0);
             auto p = distribution(_random_engine);
             parent = nullptr;
             if(p<0.5){
-                auto point = _dynamic_system->getRandomReferencePoint();
-                auto near = getNearNodeByRadiusAndNearest(point,other_tree_id,50e-6);
+                auto point = getRandomReferencePoint();
+                auto near = getNearNodeByRadiusAndNearest(point,tree_id,50e-6);
                 parent = std::static_pointer_cast<TreeNode>(near.second);
                 if(!near.first.empty()) {
                     auto it = std::min_element(near.first.begin(), near.first.end(),
@@ -69,7 +97,7 @@ namespace acsr{
                 }
             }else{
                 auto point = _dynamic_system->randomState();
-                auto near = getNearNodeByCount(point,other_tree_id,10);
+                auto near = getNearNodeByCount(point,tree_id,10);
                 auto it = std::min_element(near.begin(), near.end(),
                                            [](const NodePtr &node1,
                                               const NodePtr &node2) {
@@ -191,6 +219,13 @@ namespace acsr{
             node->setTreeNodeState(TreeNodeState::not_in_set);
         }
 
+        Eigen::VectorXd getRandomReferencePoint(){
+            std::default_random_engine engine(_random_engine);
+            std::uniform_int_distribution<int> distribution(0,reference_path->getStates().getNumPoints()-1);
+            auto index = distribution(engine);
+            return reference_path->getStates().getVector(index);
+        }
+
     public:
         explicit RefSST(std::shared_ptr<NanowireSystem> dynamic_system):SST(dynamic_system){
 
@@ -218,7 +253,7 @@ namespace acsr{
         void forwardStep() override{
             ///select a node to be explored in forward tree
             TreeNodePtr parent= nullptr;
-            searchSelection(TreeId::forward,parent);
+            if(!searchSelection(TreeId::forward,parent))return;
             if(parent->getTreeNodeState()==TreeNodeState::not_in_tree)
                 return;
             std::vector<PropagateParameters> params;
@@ -283,8 +318,8 @@ namespace acsr{
                 auto temp_cost = chooseOtherNearestForOptimization(*it,temp_target);
 
                 if(temp_target==nullptr || temp_cost>this->getMaxCost()){
-                    auto node = *it;
-                    removeNodeFromSet(node);
+                    //auto node = *it;
+                    removeNodeFromSet(*it);
                     //node->setTreeNodeState(in_close_set);
                     //it = this->optimize_set[index].erase(it);
                     //close_map[index].insert({node,std::numeric_limits<double>::max()});
@@ -299,7 +334,7 @@ namespace acsr{
                 ++it;
             }
 
-            if(explore_node ==nullptr || total_cost > this->getMaxCost())
+            if(explore_node ==nullptr || explore_node->getTreeNodeState()==TreeNodeState::not_in_tree || total_cost > this->getMaxCost())
             {
                 return;
             }
@@ -363,12 +398,6 @@ namespace acsr{
             }
         }
 
-        Eigen::VectorXd getRandomReferencePoint(){
-            std::uniform_int_distribution<int> distribution(0,reference_path->getStates().getNumPoints()-1);
-            auto index = distribution(_random_engine);
-            //unsigned index = uniform_int_random(0, reference_path->getStates().getNumPoints()-1);
-            return reference_path->getStates().getVector(index);
-        }
 
     private:
         std::shared_ptr<ReferencePath> reference_path;

@@ -310,12 +310,13 @@ namespace acsr{
 
 
             auto sst_node = std::dynamic_pointer_cast<SSTTreeNode>(node);
-            if(sst_node->getProxNode()->getMonitorNode() == sst_node){
-                sst_node->getProxNode() -> setMonitorNode(nullptr);
-            }
+            //if(sst_node->getProxNode()->getMonitorNode() == sst_node){
+            //    sst_node->getProxNode() -> setMonitorNode(nullptr);
+            //}
             sst_node->setProxNode(nullptr);
             removeNodeFromSet(node);
             removePointFromContainer(node);
+            node.reset();
         }
 
         /***
@@ -323,15 +324,36 @@ namespace acsr{
          * @param node
          */
         virtual void branchBound(TreeNodePtr node){
-            auto& children = node->getChildren();
-            for (auto iter = children.begin(); iter != children.end(); ++iter)
-            {
-                branchBound(*iter);
+            auto children = node->getChildren();
+
+            if(node->getCost() > this->getMaxCost()){
+                removeBranch(node);
+            }else{
+                for(auto &n:children){
+                    branchBound(n);
+                }
             }
-            if( node->getChildren().empty() && node->getCost() > this->getMaxCost())
-            {
-                removeLeaf(node);
+        }
+
+        virtual void removeBranch(TreeNodePtr node){
+            auto children = node->getChildren();
+            if(node->getParent()!=nullptr){
+                node->getParent()->removeChild(node);
             }
+            auto sst_node = std::dynamic_pointer_cast<SSTTreeNode>(node);
+            //if(sst_node->getProxNode()->getMonitorNode() == sst_node){
+            //    sst_node->getProxNode() -> setMonitorNode(nullptr);
+            //}
+            sst_node->setProxNode(nullptr);
+            removeNodeFromSet(node);
+            removePointFromContainer(node);
+            node->setTreeNodeState(TreeNodeState::not_in_tree);
+            //node.reset();
+
+            for(auto& n:children){
+                removeBranch(n);
+            }
+
         }
 
         /***

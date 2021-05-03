@@ -3,7 +3,11 @@
 #include "global_path.hpp"
 using namespace acsr;
 int main() {
+
+    RunPlanner run_planner;
+    run_planner.run();
     //std::cout << "Hello, World!" << std::endl;
+    /*
     int n_wire = 3;
     Eigen::VectorXd init_state(2*n_wire),target_state(2*n_wire);
     init_state<<120,120,300,1500,1500,900;
@@ -16,7 +20,7 @@ int main() {
     global_path.init(init_state,target_state,nanowire_config);
     global_path.getStartTargetElectordes();
     VariablesGrid states;
-    global_path.generateBestReferenceTrajectory(states);
+    global_path.generateBestReferenceTrajectory(states);*/
 
 
 

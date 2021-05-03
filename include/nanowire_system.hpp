@@ -28,6 +28,7 @@ namespace acsr {
                 return false;
             }
             _path.read(filename.c_str());
+            _path.print();
             return true;
         }
 
@@ -265,6 +266,7 @@ namespace acsr {
                 state(i) = randomDouble(_state_low_bound(i),_state_upper_bound(i));
             }
             return state;
+            std::cout<<state<<std::endl;
         }
 
         /***
@@ -635,11 +637,7 @@ namespace acsr {
             return reference_path->getStates();
         }
 
-        Eigen::VectorXd getRandomReferencePoint(){
-            std::default_random_engine engine(_random_engine);
-            std::uniform_int_distribution<int> distribution(0,reference_path->getStates().getNumPoints()-1);
-            return reference_path->getStates().getVector(distribution(engine));
-        }
+
 
         double getQuality(double time, const Eigen::VectorXd &state,const Eigen::VectorXd &target){
             double a=Config::refA;
@@ -726,7 +724,5 @@ namespace acsr {
     };
 
 }
-
-
 
 #endif //NANOWIREPLANNER_NANOWIRE_SYSTEM_HPP

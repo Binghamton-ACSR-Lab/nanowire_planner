@@ -449,10 +449,11 @@ namespace acsr {
         virtual ~Config()=default;
 
         static double integration_step;
-        static std::string stopping_type;
-        static double stopping_check;
-        static std::string stats_type;
-        static double stats_check;
+        //static std::string stopping_type;
+        //static double stopping_check;
+        //static std::string stats_type;
+        //static double stats_check;
+        static double total_time;
 
         static int random_seed;
 
@@ -464,11 +465,11 @@ namespace acsr {
         static bool bidirection;
         static bool optimization;
         static double optimization_distance;
-        static bool intermediate_visualization;
+        //static bool intermediate_visualization;
 
         //parameters for rrt star
-        static double rrt_delta_near;
-        static double rrt_delta_explore;
+        //static double rrt_delta_near;
+        //static double rrt_delta_explore;
 
         //parameters for SST
         static double sst_delta_near;
@@ -485,12 +486,12 @@ namespace acsr {
         static double refB;
 
         //Parameters for image output.
-        static double tree_line_width;
-        static double solution_line_width;
+        //static double tree_line_width;
+        //static double solution_line_width;
         static int image_width;
         static int image_height;
-        static double node_diameter;
-        static double solution_node_diameter;
+        //static double node_diameter;
+        //static double solution_node_diameter;
 
         /***
          * read configuration file
@@ -504,19 +505,20 @@ namespace acsr {
                     //" override the ones in the config file. A config file may contain lines with syntax"
                     //"\n'long_option_name = value'\nand comment lines that begin with '#'." )
                     ("integration_step",po::value<double>(&Config::integration_step),"Integration step for propagations.")
-                    ("stopping_type",po::value<std::string>(&Config::stopping_type),"Condition for terminating planner (iterations or time).")
-                    ("stopping_check",po::value<double>(&Config::stopping_check),"Amount of time or iterations to execute.")
-                    ("stats_type",po::value<std::string>(&Config::stats_type),"Condition for printing statistics of a planner (iterations or time).")
-                    ("stats_check",po::value<double>(&Config::stats_check),"Frequency of statistics gathering.")
-                    ("intermediate_visualization",po::value<bool>(&Config::intermediate_visualization)->default_value(false),"Flag denoting generating images during statistics gathering.")
+                    //("stopping_type",po::value<std::string>(&Config::stopping_type),"Condition for terminating planner (iterations or time).")
+                    //("stopping_check",po::value<double>(&Config::stopping_check),"Amount of time or iterations to execute.")
+                    //("stats_type",po::value<std::string>(&Config::stats_type),"Condition for printing statistics of a planner (iterations or time).")
+                    //("stats_check",po::value<double>(&Config::stats_check),"Frequency of statistics gathering.")
+                    //("intermediate_visualization",po::value<bool>(&Config::intermediate_visualization)->default_value(false),"Flag denoting generating images during statistics gathering.")
                     ("min_time_steps",po::value<unsigned>(&Config::min_time_steps),"Minimum number of simulation steps per local planner propagation.")
                     ("max_time_steps",po::value<unsigned>(&Config::max_time_steps),"Maximum number of simulation steps per local planner propagation.")
+                    ("total_time",po::value<double>(&Config::total_time),"total running time.")
                     ("random_seed",po::value<int>(&Config::random_seed),"Random seed for the planner.")
                     ("sst_delta_near",po::value<double>(&Config::sst_delta_near),"The radius for BestNear in SST.")
                     ("sst_delta_drain",po::value<double>(&Config::sst_delta_drain),"The radius for witness nodes in SST.")
                     ("planner",po::value<std::string>(),"A string for the planner to run.")
                     //("system",po::value<std::string>(),"A string for the system to plan for.")
-                    ("init_state", po::value<std::string >(), "The given start state. Input is in the format of \"0 0\"")
+                    ("start_state", po::value<std::string >(), "The given start state. Input is in the format of \"0 0\"")
                     ("goal_state", po::value<std::string >(), "The given goal state. Input is in the format of \"0 0\"")
                     ("goal_radius",po::value<double>(&Config::goal_radius),"The radius for the goal region.")
                     ("bidrection",po::value<bool>(&Config::bidirection)->default_value(false),"inverse process.")
@@ -524,8 +526,8 @@ namespace acsr {
                     ("optimization_distance",po::value<double>(&Config::optimization_distance)->default_value(0.0),"optimization begins if distance within this value")
                     ("image_width",po::value<int>(&Config::image_width),"Width of output images.")
                     ("image_height",po::value<int>(&Config::image_height),"Height of output images.")
-                    ("rrt_delta_near",po::value<double>(&Config::rrt_delta_near),"rrt star nearest range.")
-                    ("rrt_delta_explore",po::value<double>(&Config::rrt_delta_explore),"rrt star explore distance.")
+                    //("rrt_delta_near",po::value<double>(&Config::rrt_delta_near),"rrt star nearest range.")
+                    //("rrt_delta_explore",po::value<double>(&Config::rrt_delta_explore),"rrt star explore distance.")
                     ("blossom_m",po::value<unsigned>(&Config::blossomM),"isst blossom parameter.")
                     ("blossom_n",po::value<unsigned>(&Config::blossomN),"ref-isst blossom parameter.")
                     ("ref_a",po::value<double>(&Config::refA),"ref-isst quality parameter.")
@@ -545,9 +547,9 @@ namespace acsr {
             }
 
             std::vector<double> state;
-            if (varmap.count("init_state"))
+            if (varmap.count("start_state"))
             {
-                std::stringstream stream(varmap["init_state"].as<std::string>());
+                std::stringstream stream(varmap["start_state"].as<std::string>());
                 double n; while(stream >> n) {state.push_back(n*1e-6);}
                 // state = varmap["start_state"].as<std::vector<double> >();
                 Config::init_state = Eigen::VectorXd(state.size());
@@ -580,6 +582,10 @@ namespace acsr {
                     Config::planner = PlannerType::e_SST;
                 }
             }
+            Config::sst_delta_drain*=1e-6;
+            Config::sst_delta_near*=1e-6;
+            Config::goal_radius*=1e-6;
+            Config::optimization_distance*=1e-6;
 /*
             if (varmap.count("system"))
             {
@@ -598,10 +604,10 @@ namespace acsr {
     };
 
     double Config::integration_step;
-    std::string Config::stopping_type;
-    double Config::stopping_check;
-    std::string Config::stats_type;
-    double Config::stats_check;
+    //std::string Config::stopping_type;
+    // Config::stopping_check;
+    //std::string Config::stats_type;
+    //double Config::stats_check;
     unsigned Config::min_time_steps;
     unsigned Config::max_time_steps;
     int Config::random_seed;
@@ -614,19 +620,21 @@ namespace acsr {
     double Config::goal_radius =0.1;
     bool Config::bidirection = false;
     bool Config::optimization = true;
-    bool Config::intermediate_visualization = true;
+    //bool Config::intermediate_visualization = true;
     int Config::image_width=500;
     int Config::image_height=500;
     double Config::optimization_distance=0;
 
-    double Config::rrt_delta_near;
-    double Config::rrt_delta_explore;
+    //double Config::rrt_delta_near;
+    //double Config::rrt_delta_explore;
 
     unsigned Config::blossomM = 15;
     unsigned Config::blossomN = 5;
 
     double Config::refA = 1.0005;
     double Config::refB = 1.05;
+
+    double Config::total_time = 600;
 
 
 }
