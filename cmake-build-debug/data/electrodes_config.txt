@@ -1,0 +1,4 @@
+#electrodes_row electrodes_column index row_space(1e-6) column_space(1e-6) data_rows data_columns e_field_data_file_name
+4 4 0 600 600 181 181 E_Map_4by4Mask1_100V_CC600reE.txt
+3 2 0 600 600 121 121 E_Map_MaskV1CC600_100V_Z100_all6on.txt
+2 2 0 600 600 121 121 E_Map_2x2.txt
