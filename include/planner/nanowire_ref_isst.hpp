@@ -211,10 +211,6 @@ namespace acsr{
             if(node->getTreeNodeState() == TreeNodeState::in_optimize_set){
                 this->optimize_set[tree_id].erase(std::remove(begin(this->optimize_set[tree_id]), end(this->optimize_set[tree_id]), node), end(this->optimize_set[tree_id]));
 
-            }else if(node->getTreeNodeState() == TreeNodeState::in_open_set){
-                //open_map[tree_id].erase(node);
-            }else if(node->getTreeNodeState() == TreeNodeState::in_close_set){
-                //close_map[tree_id].erase(node);
             }
             node->setTreeNodeState(TreeNodeState::not_in_set);
         }
@@ -262,7 +258,7 @@ namespace acsr{
                     return;
                 for(auto param:params){
                     auto new_node = addToTree(TreeId::forward,parent,param.state,param.control,param.duration);
-                    this->checkConnection(new_node);
+                    checkConnection(new_node);
                 }
             }
         }
@@ -280,7 +276,7 @@ namespace acsr{
             std::vector<PropagateParameters> params;
             if (reverseBlossom(parent,params)){
                 ///add parent to close map
-                if(parent==nullptr)
+                if(parent==nullptr || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
                     return;
                 for(auto& param:params){
                     auto new_node = addToTree(TreeId::reverse,parent,param.state,param.control,param.duration);
@@ -318,12 +314,15 @@ namespace acsr{
                 auto temp_cost = chooseOtherNearestForOptimization(*it,temp_target);
 
                 if(temp_target==nullptr || temp_cost>this->getMaxCost()){
-                    //auto node = *it;
-                    removeNodeFromSet(*it);
+                    auto node = *it;
+                    (*it)->setTreeNodeState(TreeNodeState::not_in_set);
+                    it = this->optimize_set[index].erase(it);
+                    continue;
+
                     //node->setTreeNodeState(in_close_set);
                     //it = this->optimize_set[index].erase(it);
                     //close_map[index].insert({node,std::numeric_limits<double>::max()});
-                    continue;
+                    //continue;
                 }
 
                 if(temp_cost < total_cost){
@@ -392,9 +391,10 @@ namespace acsr{
                 for(auto i=0;i<vec_duration.size();++i){
                     connect_durations.push_back(vec_duration(i));
                 }
-                this->_planner_connection = std::make_shared<PlannerConnection>(this->_best_goal,connect_states,connect_controls,connect_durations);
-                this->branchBound(this->_root);
-                this->branchBound(this->_goal);
+                _planner_connection = std::make_shared<PlannerConnection>(this->_best_goal,connect_states,connect_controls,connect_durations);
+                branchBound(this->_root);
+                branchBound(this->_goal);
+                notifySolutionUpdate();
             }
         }
 

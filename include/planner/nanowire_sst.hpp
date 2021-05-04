@@ -80,14 +80,15 @@ namespace acsr{
             /// the original witness has a monitor node but that node has greater cost than the node we are working
             if(witness_sample->getMonitorNode())
             {
-                if(witness_sample->getMonitorNode()->isActive())
+                auto iter = witness_sample->getMonitorNode();
+                if(iter->isActive())
                 {
-                    removeNodeFromSet(witness_sample->getMonitorNode());
-                    removePointFromContainer(witness_sample->getMonitorNode());
-                    witness_sample->getMonitorNode()->setActive(false);
+                    removeNodeFromSet(iter);
+                    removePointFromContainer(iter);
+                    iter->setActive(false);
                 }
 
-                auto iter = witness_sample->getMonitorNode();
+
                 while( iter->getChildren().empty() && !iter->isActive() && !this->isInSolutionPath(iter))
                 {
                     auto next = iter->getParent();
@@ -130,6 +131,7 @@ namespace acsr{
                             this->_best_goal.first = std::static_pointer_cast<TreeNode>(n);
                             this->_best_goal.second = node;
                         }
+                        notifySolutionUpdate();
                         branchBound(_root);
                         branchBound(_goal);
                         //this->notifySolutionUpdate();
@@ -300,23 +302,17 @@ namespace acsr{
          * @param node
          */
         virtual void removeLeaf(TreeNodePtr node){
-            if(!node->getChildren().empty()){
-                std::cout<<"Remove Leaf Failure!\n";
-                return;
-            }
-            if(node->getParent()!=nullptr){
+            if(node->getParent()){
                 node->getParent()->removeChild(node);
             }
-
-
             auto sst_node = std::dynamic_pointer_cast<SSTTreeNode>(node);
             //if(sst_node->getProxNode()->getMonitorNode() == sst_node){
             //    sst_node->getProxNode() -> setMonitorNode(nullptr);
             //}
             sst_node->setProxNode(nullptr);
-            removeNodeFromSet(node);
-            removePointFromContainer(node);
-            node.reset();
+            //removeNodeFromSet(node);
+            //removePointFromContainer(node);
+            //node.reset();
         }
 
         /***
@@ -372,7 +368,7 @@ namespace acsr{
 
             auto distance = this->_dynamic_system->distance(state,nearest_vect.front()->getState());
             if(distance < Config::sst_delta_drain)
-                return std::static_pointer_cast<ProxNode>(nearest_vect.front());;
+                return std::static_pointer_cast<ProxNode>(nearest_vect.front());
 
             auto new_prox = std::make_shared<ProxNode>(state);
             addProxToContainer(new_prox,treeId);
@@ -662,6 +658,7 @@ namespace acsr{
 
                 branchBound(_root);
                 branchBound(_goal);
+                notifySolutionUpdate();
                 //this->notifySolutionUpdate();
             }
         }

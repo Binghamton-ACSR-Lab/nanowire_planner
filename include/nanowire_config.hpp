@@ -493,10 +493,13 @@ namespace acsr {
         //static double node_diameter;
         //static double solution_node_diameter;
 
+
+
         /***
          * read configuration file
          * @param file_name file name
          */
+
         static void readFile(std::string file_name){
             po::options_description opt_desc("Options");
             opt_desc.add_options()

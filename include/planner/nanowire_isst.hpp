@@ -450,9 +450,10 @@ namespace acsr{
                 for(auto i=0;i<vec_duration.size();++i){
                     connect_durations.push_back(vec_duration(i));
                 }
-                this->_planner_connection = std::make_shared<PlannerConnection>(this->_best_goal,connect_states,connect_controls,connect_durations);
-                this->branchBound(this->_root);
-                this->branchBound(this->_goal);
+                _planner_connection = std::make_shared<PlannerConnection>(this->_best_goal,connect_states,connect_controls,connect_durations);
+                branchBound(this->_root);
+                branchBound(this->_goal);
+                notifySolutionUpdate();
             }
         }
     };

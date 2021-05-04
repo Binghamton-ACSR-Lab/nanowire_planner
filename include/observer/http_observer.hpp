@@ -303,21 +303,27 @@ namespace acsr {
             run_flag = true;
             std::thread t([this]() {
                 auto service = TcpService::Create();
-                service->startWorkerThread(2);
+                service->startWorkerThread(3);
 
                 auto httpEnterCallback = [this](const brynet::net::http::HTTPParser &httpParser,
                                                 const brynet::net::http::HttpSession::Ptr &session) {
                     (void) httpParser;
                     brynet::net::http::HttpResponse response;
                     std::string body = R"(
+                <!DOCTYPE html>
                 <html>
-                    <!DOCTYPE html>
                     <head>
                         <title>Planner Data</title>
                     </head>
                     <body>
                 )";
-                    body = body + parameter_table + solution_update_table + last_solution_table + R"(</body></html>)";
+                    std::ifstream ifs("img.svg");
+                    svg_element=std::string( (std::istreambuf_iterator<char>(ifs) ),
+                                         (std::istreambuf_iterator<char>()    ) );
+                    auto it = svg_element.find_first_of("<svg");
+                    svg_element.erase(svg_element.begin(),svg_element.begin()+it-1);
+
+                    body = body + parameter_table + solution_update_table + last_solution_table + svg_element +  R"(</body></html>)";
                     response.setBody(body);
                     std::string result = response.getResult();
                     session->send(result.c_str(), result.size(), [session]() {
@@ -328,8 +334,8 @@ namespace acsr {
                 auto wsEnterCallback = [](const brynet::net::http::HttpSession::Ptr &httpSession,
                                           brynet::net::http::WebSocketFormat::WebSocketFrameType opcode,
                                           const std::string &payload) {
-                    std::cout << "frame enter of type:" << int(opcode) << std::endl;
-                    std::cout << "payload is:" << payload << std::endl;
+                    //std::cout << "frame enter of type:" << int(opcode) << std::endl;
+                    //std::cout << "payload is:" << payload << std::endl;
                     // echo frame
                     auto frame = std::make_shared<std::string>();
                     brynet::net::http::WebSocketFormat::wsFrameBuild(payload.c_str(),
@@ -390,6 +396,7 @@ namespace acsr {
         std::string solution_update_table;
         std::string last_solution_table;
         std::atomic_bool run_flag = false;
+        std::string svg_element;
     };
 }
 

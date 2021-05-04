@@ -169,69 +169,7 @@ namespace acsr {
             return nanowire_config->getRowSpace() * (nanowire_config->getElectrodesRows() - 1) * 1e6;
         }
     */
-        /***
-    * override DynamicSystem function
-    * @return
-    */
 
-        acsr::Document createImage()  {
-
-            auto width = _nanowire_config->getColumnSpace()*(_nanowire_config->getElectrodesCols()-1) *1e6;
-            auto height = _nanowire_config->getRowSpace()*(_nanowire_config->getElectrodesRows()-1) *1e6;
-
-            Dimensions dimensions(1.1 * width, 1.1 * height);
-            Layout layout(dimensions, Layout::BottomLeft);
-            Document svg(layout);
-            Polygon border(Stroke(1, Color::Black));
-            border << Point(0, 0) << Point(dimensions.width, 0)
-                   << Point(dimensions.width, dimensions.height) << Point(0, dimensions.height);
-            svg << border;
-
-            double col_space = width / (_nanowire_config->getElectrodesCols() - 1);
-            double row_space = height / (_nanowire_config->getElectrodesRows() - 1);
-
-            Stroke stroke(5, Color::Black);
-            for (auto i = 0; i < _nanowire_config->getElectrodesRows(); ++i) {
-                Line line(Point(0.05 * width, 0.05 * height + i * row_space),
-                          Point(1.05 * width, 0.05 * height + i * row_space), stroke);
-                svg << line;
-            }
-
-            for (auto i = 0; i < _nanowire_config->getElectrodesCols(); ++i) {
-                Line line(Point(0.05 * width + i * col_space, 0.05 * height),
-                          Point(0.05 * width + i * col_space, 1.05 * height),
-                          stroke);
-                svg << line;
-            }
-
-            for (auto i = 0; i < _nanowire_config->getElectrodesRows(); ++i) {
-                for (auto j = 0; j < _nanowire_config->getElectrodesCols(); ++j) {
-                    Circle circle(
-                            Point(0.05 * width + j * col_space, 0.05 * height + i * row_space),
-                            100, Fill(Color::Green));
-                    svg << circle;
-                }
-            }
-
-            return svg;
-        }
-
-        /***
-     * override DynamicSystem function
-     * @return
-     */
-
-        Point convertStateToImagePoint(const Eigen::VectorXd &state, int robot_index = 0) {
-            auto nanowire_index_in_image = _nanowire_config->getNanowirePathIndex();
-            auto width = _nanowire_config->getColumnSpace()*(_nanowire_config->getElectrodesCols()-1) *1e6;
-            auto height = _nanowire_config->getRowSpace()*(_nanowire_config->getElectrodesRows()-1) *1e6;
-            return Point(
-                    1e6 * (state(nanowire_index_in_image * 2) - _state_low_bound(nanowire_index_in_image * 2)) +
-                    0.05 * width,
-                    1e6 * (state(nanowire_index_in_image * 2 + 1) - _state_low_bound(nanowire_index_in_image * 2 + 1)) +
-                    0.05 * height
-            );
-        }
 
         /***
      * override DynamicSystem function
@@ -265,8 +203,9 @@ namespace acsr {
             for(auto i=0;i<_state_dimension;++i){
                 state(i) = randomDouble(_state_low_bound(i),_state_upper_bound(i));
             }
+            //std::cout<<state<<std::endl;
             return state;
-            std::cout<<state<<std::endl;
+
         }
 
         /***

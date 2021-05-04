@@ -89,40 +89,6 @@ namespace acsr {
 
 
 
-        /***
-         * notify solution update observers. This function should be manually called when a solution is updated
-         */
-
-       void notifySolutionUpdate() {
-           std::vector<Eigen::VectorXd> forward_state;
-           std::vector<Eigen::VectorXd> reverse_state;
-           std::vector<Eigen::VectorXd> connect_state;
-           std::vector<Eigen::VectorXd> forward_control;
-           std::vector<Eigen::VectorXd> reverse_control;
-           std::vector<Eigen::VectorXd> connect_control;
-           std::vector<double> forward_durations;
-           std::vector<double> reverse_durations;
-           std::vector<double> connect_durations;
-           getSolutionVectors(forward_state,reverse_state,connect_state,
-                              forward_control,reverse_control,connect_control,
-                              forward_durations,reverse_durations,connect_durations);
-
-           for(auto observer: solution_update_observers){
-               observer->onSolutionUpdate(forward_state,reverse_state,connect_state,forward_control,reverse_control,connect_control,forward_durations,reverse_durations,connect_durations);
-           }
-       }
-
-        /***
-         * notify planner start observers. This function should be manually called when starting a planner
-         */
-
-       void notifyPlannerStart(const std::string& planner_name,const std::string& image_name,const VariablesGrid& reference) {
-           for(auto observer: planner_start_observers){
-               observer->onPlannerStart(planner_name,_dynamic_system->getRobotCount(),_init_state,_target_state,reference,Config::bidirection,Config::optimization,
-                                        Config::total_time,Config::goal_radius,Config::integration_step,Config::min_time_steps,Config::max_time_steps,
-                                        Config::sst_delta_near,Config::sst_delta_drain,Config::optimization_distance,Config::blossomM,Config::blossomN,Config::refA,Config::refB,image_name);
-           }
-       }
 
 
 
@@ -362,6 +328,42 @@ namespace acsr {
         virtual void stop() {
             _run_flag = false;
             _dynamic_system->stop();
+        }
+
+
+        /***
+             * notify planner start observers. This function should be manually called when starting a planner
+             */
+
+       virtual void notifyPlannerStart(const std::string& planner_name,const std::string& image_name,const VariablesGrid& reference) {
+           for(auto observer: planner_start_observers){
+               observer->onPlannerStart(planner_name,_dynamic_system->getRobotCount(),_init_state,_target_state,reference,Config::bidirection,Config::optimization,
+                                        Config::total_time,Config::goal_radius,Config::integration_step,Config::min_time_steps,Config::max_time_steps,
+                                        Config::sst_delta_near,Config::sst_delta_drain,Config::optimization_distance,Config::blossomM,Config::blossomN,Config::refA,Config::refB,image_name);
+           }
+       }
+
+        /***
+  * notify solution update observers. This function should be manually called when a solution is updated
+  */
+
+        virtual void notifySolutionUpdate() {
+            std::vector<Eigen::VectorXd> forward_state;
+            std::vector<Eigen::VectorXd> reverse_state;
+            std::vector<Eigen::VectorXd> connect_state;
+            std::vector<Eigen::VectorXd> forward_control;
+            std::vector<Eigen::VectorXd> reverse_control;
+            std::vector<Eigen::VectorXd> connect_control;
+            std::vector<double> forward_durations;
+            std::vector<double> reverse_durations;
+            std::vector<double> connect_durations;
+            getSolutionVectors(forward_state,reverse_state,connect_state,
+                               forward_control,reverse_control,connect_control,
+                               forward_durations,reverse_durations,connect_durations);
+
+            for(auto observer: solution_update_observers){
+                observer->onSolutionUpdate(forward_state,reverse_state,connect_state,forward_control,reverse_control,connect_control,forward_durations,reverse_durations,connect_durations);
+            }
         }
     };
 }

@@ -30,7 +30,7 @@ namespace acsr{
         return distribution(_random_engine);
     }
 
-    double randomDouble(int _min, int _max) {
+    double randomDouble(double _min, double _max) {
         std::uniform_real_distribution<double> distribution(_min,_max);
         return distribution(_random_engine);
     }
@@ -49,6 +49,17 @@ namespace acsr{
             value = std::max(value, temp_v);
         }
         return value;
+    }
+
+    static std::string getPlannerString(PlannerType planner_type){
+        switch (planner_type) {
+            case PlannerType::e_SST:
+                return "SST";
+            case PlannerType::e_iSST:
+                return "iSST";
+            case PlannerType::e_Ref_iSST:
+                return "Ref_iSST";
+        }
     }
 
 

@@ -31,7 +31,7 @@ namespace acsr {
             ///start http server
             http_observer = std::make_shared<HttpServer>(8080);
             http_observer->runServer();
-            svg_observer = std::make_shared<SvgObserver>(nanowire_system);
+            svg_observer = std::make_shared<SvgObserver>();
         };
 
         void run() {
@@ -49,7 +49,7 @@ namespace acsr {
             planner->setGoalRadius(Config::goal_radius);
             //planner->setRandomSeed(time(NULL));
 
-
+            svg_observer->setNanowireConfig(nanowire_config);
 
             planner->registerSolutionUpdateObserver(svg_observer);
             planner->registerPlannerStartObserver(svg_observer);
@@ -67,6 +67,7 @@ namespace acsr {
             //thread_vector.push_back(std::move(forward_thread));
 
             ///reverse step thread
+
             if(Config::bidirection){
                 reverse_run_flag = true;
                 reverse_stopped_flag = false;
@@ -89,6 +90,7 @@ namespace acsr {
             auto start = std::chrono::steady_clock::now();
 
             is_running = true;
+            planner->notifyPlannerStart(getPlannerString(Config::planner),"img",nanowire_system->getReferencePathState());
             while(is_running){
 
                 std::cout<<"planner is running\n Number of Node: ";
