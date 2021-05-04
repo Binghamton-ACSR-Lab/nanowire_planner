@@ -100,7 +100,6 @@ namespace acsr {
             ss << R"(</td></tr>)";
             ss << R"( </table> )";
             parameter_table = ss.str();
-            //setData(parameter_table);
         }
 
         /***
@@ -128,7 +127,6 @@ namespace acsr {
             double duration = std::accumulate(forward_durations.begin(), forward_durations.end(), 0.0);
             duration = std::accumulate(reverse_durations.begin(), reverse_durations.end(), duration);
             duration = std::accumulate(connect_durations.begin(), connect_durations.end(), duration);
-
 
             update_history.push_back({system_clock::now(), duration});
             ss << R"( <table style="width:50%">
@@ -334,9 +332,7 @@ namespace acsr {
                 auto wsEnterCallback = [](const brynet::net::http::HttpSession::Ptr &httpSession,
                                           brynet::net::http::WebSocketFormat::WebSocketFrameType opcode,
                                           const std::string &payload) {
-                    //std::cout << "frame enter of type:" << int(opcode) << std::endl;
-                    //std::cout << "payload is:" << payload << std::endl;
-                    // echo frame
+
                     auto frame = std::make_shared<std::string>();
                     brynet::net::http::WebSocketFormat::wsFrameBuild(payload.c_str(),
                                                                      payload.size(),
@@ -370,11 +366,6 @@ namespace acsr {
 
                 while (run_flag) {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
-                    /*
-                    if (brynet::base::app_kbhit())
-                    {
-                        break;
-                    }*/
                 }
             });
 
@@ -384,7 +375,7 @@ namespace acsr {
         /***
          * @brief destructor
          */
-        virtual ~HttpServer() {
+        ~HttpServer() override {
             run_flag = false;
         }
 

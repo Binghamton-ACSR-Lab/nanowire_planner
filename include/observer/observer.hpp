@@ -7,6 +7,10 @@
 #include "nanowire_utility.hpp"
 #include "acado/acado_toolkit.hpp"
 namespace acsr {
+
+    /***
+     * solution updated observer
+     */
     class SolutionUpdateObserver {
     public:
         SolutionUpdateObserver() = default;
@@ -15,6 +19,18 @@ namespace acsr {
 
         SolutionUpdateObserver &operator=(const SolutionUpdateObserver &) = delete;
 
+        /***
+         *
+         * @param forward_states
+         * @param reverse_states
+         * @param connect_states
+         * @param forward_control
+         * @param reverse_control
+         * @param connect_control
+         * @param forward_durations
+         * @param reverse_durations
+         * @param connect_durations
+         */
         virtual void onSolutionUpdate(
                 const std::vector<Eigen::VectorXd> &forward_states,
                 const std::vector<Eigen::VectorXd> &reverse_states,
@@ -30,6 +46,9 @@ namespace acsr {
     };
 
 
+    /***
+     * planner start observer
+     */
     class PlannerStartObserver
     {
     public:
@@ -65,9 +84,8 @@ namespace acsr {
                 const Eigen::VectorXd& init_state,
                 const Eigen::VectorXd& target_state,
                 const ACADO::VariablesGrid& reference_path,
-                bool bidrectional,
+                bool bidirectional,
                 bool optimization,
-                //std::string stop_type,
                 double stop_value,
                 double goal_radius,
                 double step_size,
@@ -79,7 +97,6 @@ namespace acsr {
 
         virtual ~PlannerStartObserver()=default;
     };
-
 }
 
 
