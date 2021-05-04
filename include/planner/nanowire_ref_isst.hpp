@@ -197,13 +197,8 @@ namespace acsr{
          */
         void removeNodeFromSet(TreeNodePtr node) override {
             if(node == nullptr){
-                this->optimize_set[0].erase(std::remove(begin(this->optimize_set[0]), end(this->optimize_set[0]), node), end(this->optimize_set[0]));
-                this->optimize_set[1].erase(std::remove(begin(this->optimize_set[1]), end(this->optimize_set[1]), node), end(this->optimize_set[1]));
-
-                //open_map[0].erase(node);
-                //open_map[1].erase(node);
-                //close_map[0].erase(node);
-                //close_map[1].erase(node);
+                this->optimize_set[0].remove(node);
+                this->optimize_set[1].remove(node);
                 return;
             }
 
@@ -231,8 +226,8 @@ namespace acsr{
         RefSST(const RefSST&) = delete;
 
         ~RefSST() override{
-            this->forward_prox_container.clear();
-            this->reverse_prox_container.clear();
+            //this->forward_prox_container.clear();
+            //this->reverse_prox_container.clear();
             this->forward_tree.clear();
             this->reverse_tree.clear();
             //open_map[0].clear();
@@ -401,8 +396,6 @@ namespace acsr{
 
     private:
         std::shared_ptr<ReferencePath> reference_path;
-
-
 
     };
 }

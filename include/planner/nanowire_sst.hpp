@@ -6,8 +6,22 @@
 #define NANOWIREPLANNER_NANOWIRE_SST_HPP
 #include "nanowire_planner.hpp"
 #include "mutex"
-
+#include <unordered_map>
 namespace acsr{
+
+    struct GridHash
+    {
+        std::size_t operator()(const IVector & k) const
+        {
+            auto v = std::hash<int>()(k(0));
+            for(auto i=1;i<k.size();++i){
+                v = (v<< 4) ^ std::hash<int>()(k(i));
+            }
+
+            return v;
+        }
+    };
+
     class SST : public Planner {
 
     protected:
@@ -55,11 +69,19 @@ namespace acsr{
             if(getMaxCost() <= parent->getCost() + duration)
                 return nullptr;
 
-            ///get the witness
+            /*
             auto witness_sample = this->checkWitness(state,tree_id);
-            /// the original witness has a monitor node ant that node has less cost than the node we are working
+
             if(witness_sample->getMonitorNode()
                && witness_sample->getMonitorNode()->getCost() < parent->getCost() + duration)
+                return nullptr;*/
+            auto& map = tree_id==TreeId::forward?forward_prox_map:reverse_prox_map;
+            auto iv = _dynamic_system->getGrid(state);
+            SSTTreeNodePtr previous_node = nullptr;
+            if(map.find(iv)!=map.end())
+                previous_node = map[iv].lock();
+            if(previous_node
+               && previous_node->getCost() < parent->getCost() + duration)
                 return nullptr;
 
             ///create a new tree node
@@ -78,26 +100,25 @@ namespace acsr{
             addPointToContainer(new_node);
 
             /// the original witness has a monitor node but that node has greater cost than the node we are working
-            if(witness_sample->getMonitorNode())
+            if(previous_node)
             {
-                auto iter = witness_sample->getMonitorNode();
-                if(iter->isActive())
+                if(previous_node->isActive())
                 {
-                    removeNodeFromSet(iter);
-                    removePointFromContainer(iter);
-                    iter->setActive(false);
+                    removeNodeFromSet(previous_node);
+                    removePointFromContainer(previous_node);
+                    previous_node->setActive(false);
                 }
 
-
-                while( iter->getChildren().empty() && !iter->isActive() && !this->isInSolutionPath(iter))
+                while( previous_node->getChildren().empty() && !previous_node->isActive() && !this->isInSolutionPath(previous_node))
                 {
-                    auto next = iter->getParent();
-                    removeLeaf(iter);
-                    iter = std::static_pointer_cast<SSTTreeNode>(next);
+                    auto next = previous_node->getParent();
+                    removeLeaf(previous_node);
+                    previous_node = std::static_pointer_cast<SSTTreeNode>(next);
                 }
             }
-            witness_sample->setMonitorNode(new_node);
-            new_node->setProxNode(witness_sample);
+            //witness_sample->setMonitorNode(new_node);
+            map[iv] = new_node;
+            //new_node->setProxNode(witness_sample);
             new_node->setActive(true);
             return new_node;
         }
@@ -198,6 +219,7 @@ namespace acsr{
          * @param node
          * @param tree_id
          */
+         /*
         virtual void addProxToContainer(ProxNodePtr node,TreeId tree_id){
             if(tree_id==TreeId::forward){
                 std::scoped_lock<std::mutex> lock1(forward_prox_tree_mutex);
@@ -207,7 +229,7 @@ namespace acsr{
                 std::scoped_lock<std::mutex> lock1(reverse_prox_tree_mutex);
                 reverse_prox_container.insert({node->getState(),node});
             }
-        }
+        }*/
 
         /***
          * remove witness from searching container
@@ -238,10 +260,10 @@ namespace acsr{
             std::vector<NodePtr> temp_vec;
             if(tree_id == TreeId::forward){
                 std::unique_lock<std::mutex> lock(forward_tree_mutex);
-                temp_vec =  this->_dynamic_system->getNearNodeByCount(state,forward_tree,count);
+                temp_vec =  _dynamic_system->getNearNodeByCount(state,forward_tree,count);
             }else if(tree_id == TreeId::reverse){
                 std::unique_lock<std::mutex> lock(reverse_tree_mutex);
-                temp_vec = this->_dynamic_system->getNearNodeByCount(state,reverse_tree,count);
+                temp_vec = _dynamic_system->getNearNodeByCount(state,reverse_tree,count);
             }
             return temp_vec;
         }
@@ -309,9 +331,9 @@ namespace acsr{
             //if(sst_node->getProxNode()->getMonitorNode() == sst_node){
             //    sst_node->getProxNode() -> setMonitorNode(nullptr);
             //}
-            sst_node->setProxNode(nullptr);
-            //removeNodeFromSet(node);
-            //removePointFromContainer(node);
+            //sst_node->setProxNode(nullptr);
+            removeNodeFromSet(node);
+            removePointFromContainer(node);
             //node.reset();
         }
 
@@ -337,10 +359,7 @@ namespace acsr{
                 node->getParent()->removeChild(node);
             }
             auto sst_node = std::dynamic_pointer_cast<SSTTreeNode>(node);
-            //if(sst_node->getProxNode()->getMonitorNode() == sst_node){
-            //    sst_node->getProxNode() -> setMonitorNode(nullptr);
-            //}
-            sst_node->setProxNode(nullptr);
+            //sst_node->setProxNode(nullptr);
             removeNodeFromSet(node);
             removePointFromContainer(node);
             node->setTreeNodeState(TreeNodeState::not_in_tree);
@@ -358,7 +377,11 @@ namespace acsr{
          * @param treeId
          * @return
          */
+         /*
         virtual ProxNodePtr checkWitness(const Eigen::VectorXd& state,TreeId treeId){
+            //auto iv = _dynamic_system->getGrid(state);
+
+
             std::vector<NodePtr> nearest_vect;
             if(treeId == TreeId::forward){
                 nearest_vect = this->_dynamic_system->getNearNodeByCount(state,forward_prox_container,1);
@@ -373,8 +396,15 @@ namespace acsr{
             auto new_prox = std::make_shared<ProxNode>(state);
             addProxToContainer(new_prox,treeId);
             return new_prox;
-        }
+        }*/
 
+
+
+
+
+
+
+    protected:
 
         KdTreeType forward_tree;
         KdTreeType reverse_tree;
@@ -385,14 +415,17 @@ namespace acsr{
         SSTTreeNodePtr _root;
         SSTTreeNodePtr _goal;
 
-        KdTreeType forward_prox_container;
-        KdTreeType reverse_prox_container;
+        //KdTreeType forward_prox_container;
+        //KdTreeType reverse_prox_container;
+
+        std::unordered_map<IVector,std::weak_ptr<SSTTreeNode>,GridHash> forward_prox_map;
+        std::unordered_map<IVector,std::weak_ptr<SSTTreeNode>,GridHash> reverse_prox_map;
 
         std::mutex forward_tree_mutex;
         std::mutex reverse_tree_mutex;
 
-        std::mutex forward_prox_tree_mutex;
-        std::mutex reverse_prox_tree_mutex;
+        //std::mutex forward_prox_tree_mutex;
+        //std::mutex reverse_prox_tree_mutex;
 
 
     public:
@@ -413,8 +446,8 @@ namespace acsr{
          * destructor
          */
         ~SST() override{
-            forward_prox_container.clear();
-            reverse_prox_container.clear();
+            //forward_prox_container.clear();
+            //reverse_prox_container.clear();
             forward_tree.clear();
             reverse_tree.clear();
             optimize_set[0].clear();
@@ -426,7 +459,7 @@ namespace acsr{
          */
         void setup() override{
 
-            this->_run_flag = true;
+            _run_flag = true;
 
             ///initial start and target states,this is necessary since the dimension may not consistent.
             Eigen::VectorXd temp_init_state(this->_dynamic_system->getStateDimension());
@@ -435,10 +468,10 @@ namespace acsr{
                 temp_init_state[i]=this->_init_state[i];
                 temp_target_state[i]=this->_target_state[i];
             }
-            this->_init_state.resize(this->_dynamic_system->getStateDimension());
-            this->_target_state.resize(this->_dynamic_system->getStateDimension());
-            this->_init_state = temp_init_state;
-            this->_target_state = temp_target_state;
+            _init_state.resize(this->_dynamic_system->getStateDimension());
+            _target_state.resize(this->_dynamic_system->getStateDimension());
+            _init_state = temp_init_state;
+            _target_state = temp_target_state;
 
             ///init root and goal
             _root = std::make_shared<SSTTreeNode>(TreeId::forward, this->_init_state);
@@ -449,17 +482,20 @@ namespace acsr{
             addPointToContainer(_goal);
 
             ///initial witness for root and goal
-            auto root_prox = std::make_shared<ProxNode>(this->_init_state);
-            _root->setProxNode(root_prox);
+            //auto root_prox = std::make_shared<ProxNode>(this->_init_state);
+            //_root->setProxNode(root_prox);
             _root->setActive(true);
-            addProxToContainer(root_prox,TreeId::forward);
-            root_prox->setMonitorNode(_root);
+            //addProxToContainer(root_prox,TreeId::forward);
+            forward_prox_map[_dynamic_system->getGrid(_init_state)]= _root;
+            //root_prox->setMonitorNode(_root);
 
-            auto goal_prox = std::make_shared<ProxNode>(this->_target_state);
-            _goal->setProxNode(goal_prox);
+            //auto goal_prox = std::make_shared<ProxNode>(this->_target_state);
+            //_goal->setProxNode(goal_prox);
             _goal->setActive(true);
-            addProxToContainer(goal_prox,TreeId::reverse);
-            goal_prox->setMonitorNode(_goal);
+            //addProxToContainer(goal_prox,TreeId::reverse);
+            //goal_prox->setMonitorNode(_goal);
+            reverse_prox_map[_dynamic_system->getGrid(_target_state)]= _goal;
+
 
             ///notify observer
             /*
@@ -600,10 +636,10 @@ namespace acsr{
             //std::vector<double> vec_duration;
 
             Eigen::MatrixXd vec_state,vec_control;
-            Eigen::VectorXd vec_duration;
+            DVector vec_duration;
 
-            Eigen::VectorXd init_state;
-            Eigen::VectorXd target_state;
+            DVector init_state;
+            DVector target_state;
             if(explore_node == nullptr || target == nullptr)
                 return;
 

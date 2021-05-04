@@ -116,6 +116,11 @@ namespace acsr {
 
         ~NanowireSystem() = default;
 
+        IVector getGrid(DVector state){
+            state/=Config::sst_delta_drain;
+            return state.cast<int>();
+        }
+
         /***
          * set zeta potential
          * @param zeta_potential
@@ -149,6 +154,10 @@ namespace acsr {
         void setZetaPotential(const Eigen::VectorXd &zeta_potential) {
             assert(zeta_potential.size() == _state_dimension);
             _mat_theta = zeta_potential.asDiagonal();
+        }
+
+        auto getConfig(){
+            return _nanowire_config;
         }
 
         /***
@@ -661,6 +670,7 @@ namespace acsr {
             return true;
         }
     };
+
 
 }
 

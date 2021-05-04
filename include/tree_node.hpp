@@ -305,7 +305,7 @@ namespace acsr {
     class SSTTreeNode : public TreeNode{
 
     protected:
-        ProxNodePtr _prox_node;
+        //ProxNodePtr _prox_node;
         bool _active_state;
 
     public:
@@ -326,18 +326,18 @@ namespace acsr {
         /***
          * set prox node
          * @param node
-         */
+
         void setProxNode(ProxNodePtr node){
             _prox_node = node;
-        }
+        }*/
 
         /***
          * get prox node
          * @return
-         */
+
         ProxNodePtr getProxNode(){
             return _prox_node;
-        }
+        }*/
 
         /***
          * check whether this sstnode active
@@ -362,44 +362,45 @@ namespace acsr {
     };
 
 
-    class ProxNode : public Node{
-    private:
-        std::weak_ptr<SSTTreeNode> _monitor_node;
-
-    public:
-        ProxNode()= delete;
-
-        /***
-         * constructor, inherits from Node
-         * @param _state
-         */
-        ProxNode(const Eigen::VectorXd& _state) : Node(_state){
-        }
-
-        /***
-         * deconstructor
-         */
-        virtual ~ProxNode()= default;
-
-        /***
-         * set the monitor node
-         * @param node
-         */
-        void setMonitorNode(std::shared_ptr<SSTTreeNode> node){
-            _monitor_node = node;
-        }
-
-        /***
-         * get the monitor node
-         * @return
-         */
-        std::shared_ptr<SSTTreeNode> getMonitorNode(){
-            if(!_monitor_node.expired())
-                return _monitor_node.lock();
-            else
-                return nullptr;
-        }
-    };
+//
+//    class ProxNode : public Node{
+//    private:
+//        std::weak_ptr<SSTTreeNode> _monitor_node;
+//
+//    public:
+//        ProxNode()= delete;
+//
+//        /***
+//         * constructor, inherits from Node
+//         * @param _state
+//         */
+//        ProxNode(const Eigen::VectorXd& _state) : Node(_state){
+//        }
+//
+//        /***
+//         * deconstructor
+//         */
+//        virtual ~ProxNode()= default;
+//
+//        /***
+//         * set the monitor node
+//         * @param node
+//         */
+//        void setMonitorNode(std::shared_ptr<SSTTreeNode> node){
+//            _monitor_node = node;
+//        }
+//
+//        /***
+//         * get the monitor node
+//         * @return
+//         */
+//        std::shared_ptr<SSTTreeNode> getMonitorNode(){
+//            if(!_monitor_node.expired())
+//                return _monitor_node.lock();
+//            else
+//                return nullptr;
+//        }
+//    };
 
     using KdTreeType = spatial::point_multimap<0, Eigen::VectorXd, std::shared_ptr<Node>>;
     //using KdProxTreeType = spatial::point_multimap<0, Eigen::VectorXd, std::shared_ptr<Node>>;

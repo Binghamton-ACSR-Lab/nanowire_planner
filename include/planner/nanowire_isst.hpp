@@ -178,8 +178,8 @@ namespace acsr{
         iSST(const iSST&) = delete;
 
         ~iSST() override{
-            this->forward_prox_container.clear();
-            this->reverse_prox_container.clear();
+            //this->forward_prox_container.clear();
+            //this->reverse_prox_container.clear();
             this->forward_tree.clear();
             this->reverse_tree.clear();
             open_map[0].clear();
