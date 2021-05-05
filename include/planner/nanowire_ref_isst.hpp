@@ -51,7 +51,7 @@ namespace acsr{
 
             std::cout<<reference_path->getStates()<<std::endl;
 
-            _dynamic_system->setReferencePath(reference_path);
+            //_dynamic_system->setReferencePath(reference_path);
 
             std::vector<double> length(_dynamic_system->getRobotCount(),0.0);
             for(auto j=0;j<states.getNumPoints()-1;++j){
@@ -67,7 +67,7 @@ namespace acsr{
             std::sort(length_with_index.begin(),length_with_index.end(),[](const auto& p1,const auto& p2){
                 return p1.second>p2.second;
             });
-            _dynamic_system->setDominantIndex({length_with_index[0].first,length_with_index[1].first});
+            _dominant_index = {length_with_index[0].first,length_with_index[1].first};
         }
 
         /***
@@ -137,7 +137,7 @@ namespace acsr{
                 if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,Config::integration_step,
                                                                    steps,temp_state,temp_duration)){
                     return_value = true;
-                    quality_map[_dynamic_system->getQuality(parent->getCost() + temp_duration,temp_state,_target_state)] =
+                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state)] =
                             PropagateParameters {temp_state,temp_control,temp_duration};
                 }
             }
@@ -176,7 +176,7 @@ namespace acsr{
                 if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,Config::integration_step,
                                                                    steps,temp_state,temp_duration)){
                     return_value = true;
-                    quality_map[_dynamic_system->getQuality(parent->getCost() + temp_duration,temp_state,_target_state)] =
+                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state)] =
                             PropagateParameters {temp_state,temp_control,temp_duration};
                 }
             }
@@ -216,6 +216,55 @@ namespace acsr{
             auto index = distribution(engine);
             return reference_path->getStates().getVector(index);
         }
+
+        double getQuality(double time,  const Eigen::VectorXd &state){
+            double a=Config::refA;
+            double b=Config::refB;
+            double value;
+            //double a = 1.001,b=1.1,value;
+            auto max_time = reference_path->getMaxTime();
+            Eigen::VectorXd reference_state = reference_path->getState(time);
+            Eigen::VectorXd dominant_ref(2*_dominant_index.size());
+            Eigen::VectorXd dominant_state(2*_dominant_index.size());
+
+            Eigen::VectorXd non_dominant_ref(state.size()-2*_dominant_index.size());
+            Eigen::VectorXd non_dominant_state(state.size()-2*_dominant_index.size());
+
+            int j=0,k=0;
+            for(auto i=0;i<_dynamic_system->getRobotCount();++i){
+                if(std::find(_dominant_index.begin(),_dominant_index.end(),i)!=_dominant_index.end()){
+                    dominant_ref(2*j) = reference_state(2*i);
+                    dominant_ref(2*j+1) = reference_state(2*i+1);
+                    dominant_state(2*j) = state(2*i);
+                    dominant_state(2*j+1) = state(2*i+1);
+                    j++;
+                }else{
+                    non_dominant_ref(2*k) = reference_state(2*i);
+                    non_dominant_ref(2*k+1) = reference_state(2*i+1);
+                    non_dominant_state(2*k) = state(2*i);
+                    non_dominant_state(2*k+1) = state(2*i+1);
+                    //non_dominant_target(2*k) = target(2*i);
+                    //non_dominant_target(2*k+1) = target(2*i+1);
+                    k++;
+                }
+            }
+
+
+            double mul = 100.0;
+            if(time <= max_time){
+                //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + 0.5*std::pow(a,time-max_time)/(non_dominant_ref-non_dominant_state).norm();
+                //value = 1.0/(reference_state-state).norm();
+                value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + mul*(non_dominant_ref-non_dominant_state).norm();
+
+            }else {
+                //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +0.5*std::pow(b,max_time-time)/(non_dominant_ref-non_dominant_state).norm();;
+                //value = 1.0/(reference_state-state).norm();
+                value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +mul*(non_dominant_ref-non_dominant_state).norm();
+            }
+            return value;
+        }
+
+
 
     public:
         explicit RefSST(std::shared_ptr<NanowireSystem> dynamic_system):SST(dynamic_system){
@@ -396,6 +445,7 @@ namespace acsr{
 
     private:
         std::shared_ptr<ReferencePath> reference_path;
+        std::vector<int> _dominant_index;
 
     };
 }

@@ -152,7 +152,7 @@ namespace acsr {
             });
             v.erase( unique( v.begin(), v.end() ), v.end() );
             v.erase(std::remove_if(v.begin(),v.end(),[&](const Eigen::Vector2i& position){
-                return  (electrodePositionToPosition(position)-pt).norm()>550e-6;
+                return  (electrodePositionToPosition(position)-pt).norm()>column_space/2*std::sqrt(2.0)+10e-6;
             }),v.end());
             return v;
         }

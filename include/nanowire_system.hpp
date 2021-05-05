@@ -68,7 +68,7 @@ namespace acsr {
         const double _mu = 216.95e-3;
         const double _wire_radius = 10e-6;
 
-        std::shared_ptr<ReferencePath> reference_path;
+        //std::shared_ptr<ReferencePath> reference_path;
 
     public:
         NanowireSystem() = delete;
@@ -578,74 +578,17 @@ namespace acsr {
             return true;
         }
 
+        /*
         void setReferencePath(const std::shared_ptr<ReferencePath>& path){
             reference_path = path;
         }
         VariablesGrid getReferencePathState(){
             return reference_path->getStates();
-        }
+        }*/
 
 
 
-        double getQuality(double time, const Eigen::VectorXd &state,const Eigen::VectorXd &target){
-            double a=Config::refA;
-            double b=Config::refB;
-            double value;
-            //double a = 1.001,b=1.1,value;
-            auto max_time = reference_path->getMaxTime();
-            Eigen::VectorXd reference_state = reference_path->getState(time);
-            Eigen::VectorXd dominant_ref(2*dominant_index.size());
-            Eigen::VectorXd dominant_state(2*dominant_index.size());
 
-            Eigen::VectorXd non_dominant_ref(state.size()-2*dominant_index.size());
-            Eigen::VectorXd non_dominant_state(state.size()-2*dominant_index.size());
-            Eigen::VectorXd non_dominant_target(state.size()-2*dominant_index.size());
-            int j=0,k=0;
-            for(auto i=0;i<_state_dimension/2;++i){
-                if(std::find(dominant_index.begin(),dominant_index.end(),i)!=dominant_index.end()){
-                    dominant_ref(2*j) = reference_state(2*i);
-                    dominant_ref(2*j+1) = reference_state(2*i+1);
-                    dominant_state(2*j) = state(2*i);
-                    dominant_state(2*j+1) = state(2*i+1);
-                    j++;
-                }else{
-                    non_dominant_ref(2*k) = reference_state(2*i);
-                    non_dominant_ref(2*k+1) = reference_state(2*i+1);
-                    non_dominant_state(2*k) = state(2*i);
-                    non_dominant_state(2*k+1) = state(2*i+1);
-                    non_dominant_target(2*k) = target(2*i);
-                    non_dominant_target(2*k+1) = target(2*i+1);
-                    k++;
-                }
-            }
-
-            double dist=0;
-            for(int i=0;i<non_dominant_ref.size()/2;i++){
-                double d=(non_dominant_state[2*i]-non_dominant_target[2*i]) * (non_dominant_state[2*i]-non_dominant_target[2*i]) +
-                         (non_dominant_state[2*i+1]-non_dominant_target[2*i+1]) * (non_dominant_state[2*i+1]-non_dominant_target[2*i+1]);
-                d=std::sqrt(d);
-                dist=dist>d?dist:d;
-            }
-            dist/=MAX_VELOCITY;
-            //return std::sqrt(dist);
-            double mul = 100.0;
-            if(time <= max_time){
-                //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + 0.5*std::pow(a,time-max_time)/(non_dominant_ref-non_dominant_state).norm();
-                //value = 1.0/(reference_state-state).norm();
-                value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + mul*(non_dominant_ref-non_dominant_state).norm();
-
-            }else {
-                //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +0.5*std::pow(b,max_time-time)/(non_dominant_ref-non_dominant_state).norm();;
-                //value = 1.0/(reference_state-state).norm();
-                value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +mul*(non_dominant_ref-non_dominant_state).norm();
-            }
-            return value;
-        }
-
-        void setDominantIndex(const std::vector<int> &index)
-        {
-            dominant_index=index;
-        }
     protected:
         const double MAX_VELOCITY = 1e-7;
         std::vector<int> dominant_index;

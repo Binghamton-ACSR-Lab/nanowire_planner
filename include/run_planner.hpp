@@ -89,8 +89,10 @@ namespace acsr {
 
             auto start = std::chrono::steady_clock::now();
 
+            VariablesGrid vg;
+            vg.read("reference_path.txt");
             is_running = true;
-            planner->notifyPlannerStart(getPlannerString(Config::planner),"img",nanowire_system->getReferencePathState());
+            planner->notifyPlannerStart(getPlannerString(Config::planner),"img",vg);
             while(is_running){
 
                 std::cout<<"planner is running\n Number of Node: ";
