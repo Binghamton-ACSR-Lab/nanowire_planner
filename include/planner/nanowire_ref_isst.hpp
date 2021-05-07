@@ -8,7 +8,7 @@
 #include <boost/filesystem.hpp>
 #include "nanowire_sst.hpp"
 #include "global_path.hpp"
-
+#include <math.h>
 namespace acsr{
 
     typedef struct{
@@ -67,7 +67,10 @@ namespace acsr{
             std::sort(length_with_index.begin(),length_with_index.end(),[](const auto& p1,const auto& p2){
                 return p1.second>p2.second;
             });
-            _dominant_index = {length_with_index[0].first,length_with_index[1].first};
+            //_dominant_index = {length_with_index[0].first,length_with_index[1].first};
+            //_dominant_index = {length_with_index[0].first};
+            for(auto i=0;i<Config::dominant_path_count;++i)
+                _dominant_index.push_back(length_with_index[i].first);
         }
 
         /***
@@ -218,8 +221,8 @@ namespace acsr{
         }
 
         double getQuality(double time,  const Eigen::VectorXd &state){
-            double a=Config::refA;
-            double b=Config::refB;
+            //double a=Config::refA;
+            //double b=Config::refB;
             double value;
             //double a = 1.001,b=1.1,value;
             auto max_time = reference_path->getMaxTime();
@@ -251,15 +254,29 @@ namespace acsr{
 
 
             double mul = 100.0;
+            auto c = M_E/10.0;
             if(time <= max_time){
-                //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + 0.5*std::pow(a,time-max_time)/(non_dominant_ref-non_dominant_state).norm();
+                //auto p = max_time/time;
+                //auto t = (1.0-p)*(1-p);
+                auto q = (time/max_time-1.0)/1.0;
+                //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
+                //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + 0.1*std::pow(a,time-max_time)/(non_dominant_ref-non_dominant_state).norm();
                 //value = 1.0/(reference_state-state).norm();
-                value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + mul*(non_dominant_ref-non_dominant_state).norm();
-
+                //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + mul*(non_dominant_ref-non_dominant_state).norm();
+                //value = std::pow(c,q)/(dominant_ref-dominant_state).norm() + 0.5*std::pow(c,q)/(non_dominant_ref-non_dominant_state).norm();
+                auto z = std::exp(q);
+                value = z/(dominant_ref-dominant_state).norm();//+0.001 * z/(non_dominant_ref-non_dominant_state).norm();
             }else {
-                //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +0.5*std::pow(b,max_time-time)/(non_dominant_ref-non_dominant_state).norm();;
+                //auto p = time/max_time;
+                //auto t = (p-1.0)*(p-1)*(p-1);
+                auto q = Config::quality_decrease_factor*(max_time/time-1.0)/1.0;
+                //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
+                //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +0.1*std::pow(b,max_time-time)/(non_dominant_ref-non_dominant_state).norm();;
                 //value = 1.0/(reference_state-state).norm();
-                value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +mul*(non_dominant_ref-non_dominant_state).norm();
+                //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +mul*(non_dominant_ref-non_dominant_state).norm();
+                //value = std::pow(c,q)/(dominant_ref-dominant_state).norm() +0.5*std::pow(c,q)/(non_dominant_ref-non_dominant_state).norm();
+                auto z = std::exp(q);
+                value = z/(dominant_ref-dominant_state).norm();//+0.001 * z/(non_dominant_ref-non_dominant_state).norm();
             }
             return value;
         }

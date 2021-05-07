@@ -339,7 +339,7 @@ namespace acsr {
            for(auto observer: planner_start_observers){
                observer->onPlannerStart(planner_name,_dynamic_system->getRobotCount(),_init_state,_target_state,reference,Config::bidirection,Config::optimization,
                                         Config::total_time,Config::goal_radius,Config::integration_step,Config::min_time_steps,Config::max_time_steps,
-                                        Config::sst_delta_near,Config::sst_delta_drain,Config::optimization_distance,Config::blossomM,Config::blossomN,Config::refA,Config::refB,image_name);
+                                        Config::sst_delta_near,Config::sst_delta_drain,Config::optimization_distance,Config::blossomM,Config::blossomN,Config::dominant_path_count,Config::quality_decrease_factor,image_name);
            }
        }
 

@@ -91,7 +91,7 @@ namespace acsr {
                 double step_size,
                 int min_steps,int max_steps, double sst_delta_near, double sst_delta_drain,
                 double optimization_distance,
-                int m,int n,double a,double b,
+                int m,int n,int dominant_path_count,double quality_decrease_factor,
                 const std::string& image_name
         ) =0;
 

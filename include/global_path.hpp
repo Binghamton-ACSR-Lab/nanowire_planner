@@ -30,8 +30,8 @@ namespace acsr {
             _nanowire_config = nanowire_config;
 
             double multiply = 1.0;
-            if (_init_state.size() > 2) {
-                multiply = multiply + 0.30 * (_init_state.size() - 2);
+            if (_init_state.size()/2 > 3) {
+                multiply = multiply + 0.30 * (_init_state.size()/2 - 2);
 
                 for (auto i = 0; i < ref_time.getNumPoints(); ++i) {
                     ref_time.setTime(i, multiply * ref_time.getTime(i));

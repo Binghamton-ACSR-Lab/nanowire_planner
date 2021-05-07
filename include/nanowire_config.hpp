@@ -482,8 +482,10 @@ namespace acsr {
 
         //parameters for ref-iSST
         static unsigned blossomN;
-        static double refA;
-        static double refB;
+        //static double refA;
+        //static double refB;
+        static double quality_decrease_factor;
+        static int dominant_path_count;
 
         //Parameters for image output.
         //static double tree_line_width;
@@ -533,8 +535,8 @@ namespace acsr {
                     //("rrt_delta_explore",po::value<double>(&Config::rrt_delta_explore),"rrt star explore distance.")
                     ("blossom_m",po::value<unsigned>(&Config::blossomM),"isst blossom parameter.")
                     ("blossom_n",po::value<unsigned>(&Config::blossomN),"ref-isst blossom parameter.")
-                    ("ref_a",po::value<double>(&Config::refA),"ref-isst quality parameter.")
-                    ("ref_b",po::value<double>(&Config::refB),"ref-isst quality parameter.")
+                    ("dominant_path_count",po::value<int>(&Config::dominant_path_count),"ref-isst quality index count.")
+                    ("quality_decrease_factor",po::value<double>(&Config::quality_decrease_factor),"isst quality parameter.")
                     ;
 
             po::variables_map varmap;
@@ -634,8 +636,10 @@ namespace acsr {
     unsigned Config::blossomM = 15;
     unsigned Config::blossomN = 5;
 
-    double Config::refA = 1.0005;
-    double Config::refB = 1.05;
+    //double Config::refA = 1.0005;
+    //double Config::refB = 1.05;
+    int Config::dominant_path_count = 2;
+    double Config::quality_decrease_factor = 1.5;
 
     double Config::total_time = 600;
 
