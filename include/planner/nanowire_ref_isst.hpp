@@ -49,7 +49,7 @@ namespace acsr{
             reference_path = std::make_shared<ReferencePath>();
             reference_path->readFile("reference_path.txt");
 
-            std::cout<<reference_path->getStates()<<std::endl;
+            //std::cout<<reference_path->getStates()<<std::endl;
 
             //_dynamic_system->setReferencePath(reference_path);
 
@@ -92,8 +92,7 @@ namespace acsr{
                 parent = std::static_pointer_cast<TreeNode>(near.second);
                 if(!near.first.empty()) {
                     auto it = std::min_element(near.first.begin(), near.first.end(),
-                                               [](const NodePtr &node1,
-                                                  const NodePtr &node2) {
+                                               [](const NodePtr &node1,const NodePtr &node2) {
                                                    return std::static_pointer_cast<TreeNode>(node1)->getCost() < std::static_pointer_cast<TreeNode>(node2)->getCost();
                                                });
                     parent = std::static_pointer_cast<TreeNode>(*it);
@@ -102,8 +101,7 @@ namespace acsr{
                 auto point = _dynamic_system->randomState();
                 auto near = getNearNodeByCount(point,tree_id,10);
                 auto it = std::min_element(near.begin(), near.end(),
-                                           [](const NodePtr &node1,
-                                              const NodePtr &node2) {
+                                           [](const NodePtr &node1, const NodePtr &node2) {
                                                return std::static_pointer_cast<TreeNode>(node1)->getCost() < std::static_pointer_cast<TreeNode>(node2)->getCost();
                                            });
                 parent = std::static_pointer_cast<TreeNode>(*it);
@@ -214,17 +212,14 @@ namespace acsr{
         }
 
         Eigen::VectorXd getRandomReferencePoint(){
-            std::default_random_engine engine(_random_engine);
+            //std::default_random_engine engine(_random_engine);
             std::uniform_int_distribution<int> distribution(0,reference_path->getStates().getNumPoints()-1);
-            auto index = distribution(engine);
+            auto index = distribution(_random_engine);
             return reference_path->getStates().getVector(index);
         }
 
         double getQuality(double time,  const Eigen::VectorXd &state){
-            //double a=Config::refA;
-            //double b=Config::refB;
             double value;
-            //double a = 1.001,b=1.1,value;
             auto max_time = reference_path->getMaxTime();
             Eigen::VectorXd reference_state = reference_path->getState(time);
             Eigen::VectorXd dominant_ref(2*_dominant_index.size());
@@ -319,6 +314,18 @@ namespace acsr{
                     return;
                 for(auto param:params){
                     auto new_node = addToTree(TreeId::forward,parent,param.state,param.control,param.duration);
+                    if(Config::show_node && new_node!= nullptr){
+                        auto state = new_node->getState();
+                        std::thread t([this,state](){
+                            Eigen::VectorXd s(2*_dominant_index.size());
+                            for(auto i=0;i<_dominant_index.size();++i){
+                                s[2*i] = state[2*_dominant_index[i]];
+                                s[2*i+1] = state[2*_dominant_index[i]+1];
+                            }
+                            notifyNodeAdded(state,TreeId::forward);
+                        });
+                        t.detach();
+                    }
                     checkConnection(new_node);
                 }
             }
@@ -341,6 +348,19 @@ namespace acsr{
                     return;
                 for(auto& param:params){
                     auto new_node = addToTree(TreeId::reverse,parent,param.state,param.control,param.duration);
+                    if(Config::show_node && new_node!= nullptr){
+                        auto state = new_node->getState();
+                        std::thread t([this,state](){
+                            Eigen::VectorXd s(2*_dominant_index.size());
+                            for(auto i=0;i<_dominant_index.size();++i){
+                                s[2*i] = state[2*_dominant_index[i]];
+                                s[2*i+1] = state[2*_dominant_index[i]+1];
+                            }
+                            notifyNodeAdded(state,TreeId::reverse);
+                        });
+                        t.detach();
+
+                    }
                     this->checkConnection(new_node);
                 }
             }

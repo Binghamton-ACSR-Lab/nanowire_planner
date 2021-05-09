@@ -492,6 +492,7 @@ namespace acsr {
         //static double solution_line_width;
         static int image_width;
         static int image_height;
+        static bool show_node;
         //static double node_diameter;
         //static double solution_node_diameter;
 
@@ -537,6 +538,7 @@ namespace acsr {
                     ("blossom_n",po::value<unsigned>(&Config::blossomN),"ref-isst blossom parameter.")
                     ("dominant_path_count",po::value<int>(&Config::dominant_path_count),"ref-isst quality index count.")
                     ("quality_decrease_factor",po::value<double>(&Config::quality_decrease_factor),"isst quality parameter.")
+                    ("show_node",po::value<bool>(&Config::show_node),"show node on image.")
                     ;
 
             po::variables_map varmap;
@@ -622,7 +624,7 @@ namespace acsr {
     //DynamicSystemType Config::dynamic_system = DynamicSystemType::PointType;
     Eigen::VectorXd Config::init_state;
     Eigen::VectorXd Config::goal_state;
-    double Config::goal_radius =0.1;
+    double Config::goal_radius =10;
     bool Config::bidirection = false;
     bool Config::optimization = true;
     //bool Config::intermediate_visualization = true;
@@ -639,9 +641,10 @@ namespace acsr {
     //double Config::refA = 1.0005;
     //double Config::refB = 1.05;
     int Config::dominant_path_count = 2;
-    double Config::quality_decrease_factor = 1.5;
+    double Config::quality_decrease_factor = 1.1;
 
     double Config::total_time = 600;
+    bool Config::show_node = false;
 
 
 }

@@ -97,6 +97,22 @@ namespace acsr {
 
         virtual ~PlannerStartObserver()=default;
     };
+
+    /***
+     * node added observer
+     */
+    class NodeAddedObserver
+    {
+    public:
+        NodeAddedObserver()=default;
+        NodeAddedObserver(const NodeAddedObserver&) = delete;
+        NodeAddedObserver& operator=(const NodeAddedObserver&) = delete;
+
+
+        virtual void onNodeAdded(const Eigen::VectorXd& state,TreeId id) = 0;
+
+        virtual ~NodeAddedObserver()=default;
+    };
 }
 
 

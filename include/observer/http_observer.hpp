@@ -322,7 +322,13 @@ namespace acsr {
                     auto it = svg_element.find_first_of("<svg");
                     svg_element.erase(svg_element.begin(),svg_element.begin()+it-1);
 
-                    body = body + parameter_table + solution_update_table + last_solution_table + svg_element +  R"(</body></html>)";
+                    std::ifstream solution_ifs("img_solution.svg");
+                    auto solution_svg=std::string( (std::istreambuf_iterator<char>(solution_ifs) ),
+                                             (std::istreambuf_iterator<char>()    ) );
+                    auto it1 = solution_svg.find_first_of("<svg");
+                    solution_svg.erase(solution_svg.begin(),solution_svg.begin()+it1-1);
+
+                    body = body + parameter_table + solution_update_table + last_solution_table + (Config::show_node?svg_element:"") +solution_svg  +  R"(</body></html>)";
                     response.setBody(body);
                     std::string result = response.getResult();
                     session->send(result.c_str(), result.size(), [session]() {
@@ -334,31 +340,27 @@ namespace acsr {
                                           brynet::net::http::WebSocketFormat::WebSocketFrameType opcode,
                                           const std::string &payload) {
 
-                    auto frame = std::make_shared<std::string>();
+                    std::string frame;
                     brynet::net::http::WebSocketFormat::wsFrameBuild(payload.c_str(),
                                                                      payload.size(),
-                                                                     *frame,
+                                                                     frame,
                                                                      brynet::net::http::WebSocketFormat::WebSocketFrameType::TEXT_FRAME,
                                                                      true,
                                                                      false);
-                    httpSession->send(frame);
+                    httpSession->send(std::move(frame));
 
                 };
 
                 brynet::net::wrapper::HttpListenerBuilder listenBuilder;
-                listenBuilder.configureService(service)
-                        .configureSocketOptions({
+                listenBuilder.WithService(service)
+                        .AddSocketProcess({
                                                         [](TcpSocket &socket) {
                                                             socket.setNodelay();
                                                         },
                                                 })
-                        .configureConnectionOptions({
-                                                            AddSocketOption::WithMaxRecvBufferSize(1024),
-                                                    })
-                        .configureListen([this](wrapper::BuildListenConfig builder) {
-                            builder.setAddr(false, "0.0.0.0", port);
-                        })
-                        .configureEnterCallback([httpEnterCallback, wsEnterCallback](
+                        .WithMaxRecvBufferSize(2048)
+                        .WithAddr(false, "0.0.0.0", port)
+                        .WithEnterCallback([httpEnterCallback, wsEnterCallback](
                                 const brynet::net::http::HttpSession::Ptr &httpSession,
                                 brynet::net::http::HttpSessionHandlers &handlers) {
                             handlers.setHttpCallback(httpEnterCallback);
@@ -370,6 +372,7 @@ namespace acsr {
                 while (run_flag) {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
                 }
+                service->stopWorkerThread();
             });
 
             t.detach();

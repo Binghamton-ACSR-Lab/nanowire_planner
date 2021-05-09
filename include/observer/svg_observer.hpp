@@ -11,18 +11,20 @@
 
 namespace acsr {
 
-    class SvgObserver : public SolutionUpdateObserver, public PlannerStartObserver {
+    class SvgObserver : public SolutionUpdateObserver, public PlannerStartObserver, public NodeAddedObserver{
     private:
         const std::vector<Color> colors =  { Color::Red, Color::Black, Color::Blue, Color::Brown, Color::Cyan, Color::Fuchsia,
                                              Color::Green, Color::Lime, Color::Magenta, Color::Orange, Color::Purple, Color::Silver };
+        const std::vector<Color> node_colors={Color::Black,Color::Purple,Color::Orange,Color::Red};
         const double zoom = 1.0/3.0;
         std::string directory_name;
         std::shared_ptr <NanowireConfig> _nanowire_config;
         double width,height;
         Document original_image;
+        Document solution_image;
         int index = 0; ///updated index
         std::string shared_image_name;
-
+        std::mutex m;
     public:
         /***
          * default constructor
@@ -37,6 +39,8 @@ namespace acsr {
          * defalut deconstructor
          */
         virtual ~SvgObserver() = default;
+
+
 
         /***
          * set dynamic system params
@@ -87,7 +91,7 @@ namespace acsr {
                 double optimization_distance,
                 int m,int n,int a,double b,
                 const std::string& image_name
-        ){
+        ) override{
             original_image = createImage();
             auto now = std::chrono::system_clock::now();
             auto in_time_t = std::chrono::system_clock::to_time_t(now);
@@ -106,8 +110,10 @@ namespace acsr {
                 }
                 original_image << ref_path;
             }
-
+            solution_image = original_image;
             original_image.save(shared_image_name+".svg");
+            original_image.save(shared_image_name+"_solution.svg");
+
         }
 
         /***
@@ -130,10 +136,10 @@ namespace acsr {
                                       const std::vector <Eigen::VectorXd> &connect_control,
                                       const std::vector<double> &forward_durations,
                                       const std::vector<double> &reverse_durations,
-                                      const std::vector<double> &connect_durations){
+                                      const std::vector<double> &connect_durations) override{
 
             ///copy the electrodes system image
-            Document image(original_image);
+            Document image(solution_image);
 
             for(auto i=0;i<_nanowire_config->getNanowireCount();++i) {
                 ///forward path
@@ -186,7 +192,7 @@ namespace acsr {
 
 
             image.save(directory_name + "/image_" + std::to_string(index) + ".svg");
-            image.save(shared_image_name+".svg");
+            image.save(shared_image_name+"_solution.svg");
             index++;
         }
 
@@ -232,6 +238,21 @@ namespace acsr {
             return svg;
         }
 
+        void onNodeAdded(const Eigen::VectorXd &state,TreeId id) override {
+            std::scoped_lock<std::mutex> lock(m);
+            if(id==TreeId::forward) {
+                for(auto i=0;i<state.size()/2;++i) {
+                    Circle circle(convertStateToImagePoint(state, i),2, Fill(colors[i]));
+                    original_image<<circle;
+                }
+            }else if(id==TreeId::reverse){
+                for(auto i=0;i<state.size()/2;++i) {
+                    Circle circle(convertStateToImagePoint(state, i),2, Fill(*(colors.rbegin()+i)));
+                    original_image<<circle;
+                }
+            }
+        }
+
         /***
          * convert the nanowire system state to point in svg image
          * @param state nanowire system state
@@ -246,6 +267,11 @@ namespace acsr {
                     0.05 * height
             );
         }
+
+        void update(){
+            original_image.save(shared_image_name+".svg");
+        }
+
 
     };
 }

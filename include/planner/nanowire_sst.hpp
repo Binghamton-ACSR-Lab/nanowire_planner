@@ -126,7 +126,6 @@ namespace acsr{
         void checkConnection(TreeNodePtr node){
             if(node == nullptr)return;
             TreeId another_treeid = (node->getTreeId()==TreeId::forward?TreeId::reverse:TreeId::forward);
-
             ///check solution update
             auto nearest_vec_node = getNearNodeByRadiusAndNearest(node->getState(),another_treeid,Config::optimization_distance);
 

@@ -5,7 +5,9 @@ using namespace acsr;
 int main() {
 
     RunPlanner run_planner;
-    run_planner.run();
+    run_planner.init();
+    run_planner.runByTcp();
+    //run_planner.run();
     //std::cout << "Hello, World!" << std::endl;
     /*
     int n_wire = 3;

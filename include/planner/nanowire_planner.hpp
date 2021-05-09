@@ -59,6 +59,7 @@ namespace acsr {
 
         std::vector<std::shared_ptr<SolutionUpdateObserver>> solution_update_observers;
         std::vector<std::shared_ptr<PlannerStartObserver>> planner_start_observers;
+        std::vector<std::shared_ptr<NodeAddedObserver>> node_added_observers;
 
         /// a flag to indicate the planner is stopped. This flag is used to terminate long time process
         std::atomic_bool _run_flag;
@@ -224,6 +225,26 @@ namespace acsr {
        }
 
         /***
+          * register a node added observer
+          * @param observer inherits from NodeAddedObserver
+          */
+
+        virtual void registerNodeAddedObserver(const std::shared_ptr<NodeAddedObserver>& observer){
+            node_added_observers.push_back(observer);
+        }
+
+        /***
+         * unregister a node added observer
+         * @param observer inherits from NodeAddedObserver
+         */
+
+        virtual void unregisterSolutionUpdateObserver(const std::shared_ptr<NodeAddedObserver>& observer){
+            node_added_observers.erase(std::find(node_added_observers.begin(),node_added_observers.end(),observer));
+        }
+
+
+
+        /***
          * register a planner started observer
          * @param observer inherits from PlannerStartObserver
          */
@@ -342,6 +363,12 @@ namespace acsr {
                                         Config::sst_delta_near,Config::sst_delta_drain,Config::optimization_distance,Config::blossomM,Config::blossomN,Config::dominant_path_count,Config::quality_decrease_factor,image_name);
            }
        }
+
+        virtual void notifyNodeAdded(const Eigen::VectorXd& state,TreeId id) {
+           for(auto observer: node_added_observers){
+               observer->onNodeAdded(state,id);
+           }
+        }
 
         /***
   * notify solution update observers. This function should be manually called when a solution is updated
