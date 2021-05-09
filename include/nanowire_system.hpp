@@ -428,8 +428,9 @@ namespace acsr {
             double int_step_max = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * int_step;
 
 
-            if (!optimize(x0, xt, int_step_max, states, controls))
+            if (!optimize(x0, xt, int_step_max, states, controls)) {
                 return false;
+            }
 
             vec_state.resize(controls->getNumPoints(), 2 * nanowire_count);
             vec_control.resize(controls->getNumPoints(), _control_dimension);
@@ -529,6 +530,7 @@ namespace acsr {
                     x.clearStaticCounters();
                     u.clearStaticCounters();
                     T.clearStaticCounters();
+                    if(!_run_flag)return false;
                     continue;
                 }
 
@@ -555,7 +557,7 @@ namespace acsr {
                         ACADO::DVector mat_velocity = _mat_theta * mat_E * vec_u * _em / _mu;
                         curr_state += mat_velocity * int_step;
                         current_time += int_step;
-
+                        if(!_run_flag)return false;
                         if (!validState(curr_state))
                             return false;
                     }
@@ -575,6 +577,7 @@ namespace acsr {
             x.clearStaticCounters();
             u.clearStaticCounters();
             T.clearStaticCounters();
+            if(!_run_flag)return false;
             return true;
         }
 

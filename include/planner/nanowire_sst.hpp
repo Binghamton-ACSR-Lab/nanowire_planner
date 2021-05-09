@@ -104,7 +104,7 @@ namespace acsr{
             {
                 if(previous_node->isActive())
                 {
-                    removeNodeFromSet(previous_node);
+                    //removeNodeFromSet(previous_node);
                     removePointFromContainer(previous_node);
                     previous_node->setActive(false);
                 }
@@ -234,19 +234,16 @@ namespace acsr{
          * remove witness from searching container
          * @param node
          */
-        virtual void removeNodeFromSet(TreeNodePtr node){
-            if(node == nullptr){
-                optimize_set[0].erase(std::remove(begin(optimize_set[0]), end(optimize_set[0]), node), end(optimize_set[0]));
-                optimize_set[1].erase(std::remove(begin(optimize_set[1]), end(optimize_set[1]), node), end(optimize_set[1]));
-                return;
-            }
-
+         /*
+        virtual void removeNodeFromSet(std::weak_ptr<SSTTreeNode>& n){
+            if(n.expired())return;
+            auto node=n.lock();
             int tree_id = node->getTreeId()==TreeId::forward?0:1;
             if(node->getTreeNodeState() == TreeNodeState::in_optimize_set){
                 optimize_set[tree_id].erase(std::remove(begin(optimize_set[tree_id]), end(optimize_set[tree_id]), node), end(optimize_set[tree_id]));
                 node->setTreeNodeState(TreeNodeState::not_in_set);
             }
-        }
+        }*/
 
         /***
          * get nearest n nodes
@@ -331,7 +328,7 @@ namespace acsr{
             //    sst_node->getProxNode() -> setMonitorNode(nullptr);
             //}
             //sst_node->setProxNode(nullptr);
-            removeNodeFromSet(node);
+            //removeNodeFromSet(node);
             removePointFromContainer(node);
             //node.reset();
         }
@@ -359,7 +356,7 @@ namespace acsr{
             }
             auto sst_node = std::dynamic_pointer_cast<SSTTreeNode>(node);
             //sst_node->setProxNode(nullptr);
-            removeNodeFromSet(node);
+            //removeNodeFromSet(node);
             removePointFromContainer(node);
             node->setTreeNodeState(TreeNodeState::not_in_tree);
             //node.reset();
@@ -409,7 +406,7 @@ namespace acsr{
         KdTreeType reverse_tree;
 
         std::mutex optimize_set_mutex[2];
-        std::list<TreeNodePtr> optimize_set[2];
+        std::list<std::weak_ptr<TreeNode>> optimize_set[2];
 
         SSTTreeNodePtr _root;
         SSTTreeNodePtr _goal;
@@ -456,7 +453,7 @@ namespace acsr{
         /***
          * override setup
          */
-        void setup() override{
+        void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) override{
 
             _run_flag = true;
 
@@ -580,65 +577,60 @@ namespace acsr{
          * override connecting step
          */
         void connectingStep() override{
+            if(!_run_flag)return;
             if(!this->_is_optimized_connect)
                 return;
 
-            if(optimize_set[0].empty() && optimize_set[1].empty())
+            if(this->optimize_set[0].empty() && this->optimize_set[1].empty())
                 return;
             TreeNodePtr explore_node = nullptr;
             TreeNodePtr target = nullptr;
             TreeNodePtr temp_target = nullptr;
             //mutex_for_set.lock();
             auto index = randomInteger(0,1);
-            if(optimize_set[index].empty())
+            if(this->optimize_set[index].empty())
                 index = 1-index;
 
             double total_cost = std::numeric_limits<double>::max();
-
-             {
-                std::scoped_lock<std::mutex> lock(optimize_set_mutex[index]);
-                auto it = optimize_set[index].begin();
-                while (it != optimize_set[index].end()) {
-                if (*it == nullptr || (*it)->getTreeNodeState() == TreeNodeState::not_in_tree) {
-                    auto node = *it;
+            auto it = this->optimize_set[index].begin();
+            while(it!=this->optimize_set[index].end()){
+                if(!_run_flag)return;
+                TreeNodePtr n = nullptr;
+                if((*it).expired()){
                     it = optimize_set[index].erase(it);
-                    removePointFromContainer(node);
                     continue;
                 }
-                auto temp_cost = chooseOtherNearestForOptimization(*it, temp_target);
-
-                if (temp_target == nullptr || temp_cost > this->getMaxCost()) {
-                    //std::cout<<it-optimize_set[index].begin()<<'\t'<<optimize_set[index].size()<<std::endl;
-                    auto node = *it;
-                    (*it)->setTreeNodeState(not_in_set);
+                n=it->lock();
+                if(n == nullptr || n->getTreeNodeState()==TreeNodeState::not_in_tree || n->getTreeNodeState()==TreeNodeState::not_in_set) {
                     it = optimize_set[index].erase(it);
-                    //removePointFromContainer(node);
+                    continue;
+                }
+                auto temp_cost = chooseOtherNearestForOptimization(n,temp_target);
+                if(temp_target==nullptr || temp_cost>this->getMaxCost()){
+                    n->setTreeNodeState(TreeNodeState::not_in_set);
+                    it = this->optimize_set[index].erase(it);
                     continue;
                 }
 
-                if (temp_cost < total_cost) {
-                    total_cost = temp_cost;
-                    explore_node = *it;
-                    target = temp_target;
+                if(temp_cost < total_cost){
+                    total_cost =temp_cost;
+                    explore_node = n;
+                    target=temp_target;
                 }
                 ++it;
-                }
             }
 
-            if(explore_node ==nullptr || total_cost > this->getMaxCost())
+            if(explore_node ==nullptr || explore_node->getTreeNodeState()==TreeNodeState::not_in_tree || total_cost > this->getMaxCost())
             {
                 return;
             }
 
-            //std::vector<Eigen::VectorXd> vec_state;
-            //std::vector<Eigen::VectorXd> vec_control;
-            //std::vector<double> vec_duration;
+            Eigen::MatrixXd vec_state;
+            Eigen::MatrixXd vec_control;
+            Eigen::VectorXd vec_duration;
 
-            Eigen::MatrixXd vec_state,vec_control;
-            DVector vec_duration;
-
-            DVector init_state;
-            DVector target_state;
+            Eigen::VectorXd init_state;
+            Eigen::VectorXd target_state;
             if(explore_node == nullptr || target == nullptr)
                 return;
 
@@ -653,10 +645,13 @@ namespace acsr{
             bool optimized = this->_dynamic_system->connect(init_state, target_state,
                                                             Config::integration_step,
                                                             vec_state, vec_control,vec_duration);
+            if(!_run_flag)return;
             if(explore_node == nullptr || target == nullptr)
                 return;
-            //removePointFromContainer(explore_node);
-            removeNodeFromSet(explore_node);
+
+            //removeNodeFromSet(explore_node);
+            explore_node->setTreeNodeState(TreeNodeState::not_in_set);
+
             if(!optimized){
                 return;
             }
@@ -674,7 +669,6 @@ namespace acsr{
                     this->_best_goal.second = explore_node;
                 }
 
-
                 std::vector<Eigen::VectorXd> connect_states;
                 std::vector<Eigen::VectorXd> connect_controls;
                 std::vector<double> connect_durations;
@@ -687,14 +681,10 @@ namespace acsr{
                 for(auto i=0;i<vec_duration.size();++i){
                     connect_durations.push_back(vec_duration(i));
                 }
-
-
-                this->_planner_connection = std::make_shared<PlannerConnection>(this->_best_goal,connect_states,connect_controls,connect_durations);
-
-                branchBound(_root);
-                branchBound(_goal);
+                _planner_connection = std::make_shared<PlannerConnection>(this->_best_goal,connect_states,connect_controls,connect_durations);
+                branchBound(this->_root);
+                branchBound(this->_goal);
                 notifySolutionUpdate();
-                //this->notifySolutionUpdate();
             }
         }
     };

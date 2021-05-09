@@ -113,6 +113,14 @@ namespace acsr {
 
         virtual ~NodeAddedObserver()=default;
     };
+
+    class MessageDisplayer{
+    public:
+        MessageDisplayer() = default;
+        virtual ~MessageDisplayer()=default;
+
+        virtual void displayMessage(const std::string& msg)=0;
+    };
 }
 
 

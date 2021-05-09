@@ -104,7 +104,7 @@ namespace acsr {
         /***
          * necessary setups when starting a planner
          */
-        virtual void setup() = 0;
+        virtual void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) = 0;
 
         /***
          * one forward step. this function can be called in a while loop for a forward propagating process
@@ -388,6 +388,7 @@ namespace acsr {
                                forward_control,reverse_control,connect_control,
                                forward_durations,reverse_durations,connect_durations);
 
+            if(!_run_flag)return;
             for(auto observer: solution_update_observers){
                 observer->onSolutionUpdate(forward_state,reverse_state,connect_state,forward_control,reverse_control,connect_control,forward_durations,reverse_durations,connect_durations);
             }

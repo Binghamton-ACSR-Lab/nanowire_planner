@@ -122,7 +122,7 @@ namespace acsr {
 
         std::vector<std::vector<ElectordePositionType>> generateGlobalPath(){
             std::vector<std::vector<ElectordePositionType>> electrodes_paths;
-            const std::vector<std::vector<int>> divided_vecs{{2},{3},{4},{3,2},{3,3},{4,3},{4,4},{3,3,3},{3,3,4},{3,4,4},{4,4,4},{4,3,3,3},{4,4,3,3}};
+            const std::vector<std::vector<int>> divided_vecs{{1},{2},{3},{4},{3,2},{3,3},{4,3},{4,4},{3,3,3},{3,3,4},{3,4,4},{4,4,4},{4,3,3,3},{4,4,3,3}};
             for(auto k=0;k<global_start_target.size();++k) {
 
                 global::GlobalRoute global_route;
@@ -139,7 +139,7 @@ namespace acsr {
                 std::vector<global::IndexType> path;
 
 
-                if (global_route.constructTree(_n_wires, init_index, target_index, divided_vecs[_n_wires - 2])) {
+                if (global_route.constructTree(_n_wires, init_index, target_index, divided_vecs[_n_wires - 1])) {
                     path = global_route.getBestSolution();
                     std::vector<ElectordePositionType> electrode_path;
                     for(auto it=path.rbegin();it!=path.rend();++it){

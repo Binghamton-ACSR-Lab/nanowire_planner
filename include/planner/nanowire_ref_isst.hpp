@@ -30,8 +30,8 @@ namespace acsr{
         /***
          * setup
          */
-        void setup() override {
-            SST::setup();
+        void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) override {
+            SST::setup(nanowire_config);
             //double total_cost = this->_dynamic_system->getHeuristic(this->_init_state,this->_target_state);
 
             //open_map[0].insert({this->_root,total_cost});
@@ -39,8 +39,8 @@ namespace acsr{
             //open_map[1].insert({this->_goal,total_cost});
             //this->_goal->setTreeNodeState(in_open_set);
             GlobalPath global_path;
-            auto nanowire_config = std::make_shared<NanowireConfig>();
-            nanowire_config->readFile("config/nanowire.cfg");
+            //auto nanowire_config = std::make_shared<NanowireConfig>();
+            //nanowire_config->readFile("config/nanowire.cfg");
             global_path.init(_init_state,_target_state,nanowire_config);
             global_path.getStartTargetElectordes();
             VariablesGrid states;
@@ -69,7 +69,8 @@ namespace acsr{
             });
             //_dominant_index = {length_with_index[0].first,length_with_index[1].first};
             //_dominant_index = {length_with_index[0].first};
-            for(auto i=0;i<Config::dominant_path_count;++i)
+            auto v = std::min(Config::dominant_path_count,_dynamic_system->getRobotCount());
+            for(auto i=0;i<v;++i)
                 _dominant_index.push_back(length_with_index[i].first);
         }
 
@@ -195,13 +196,8 @@ namespace acsr{
         /***
          * remove witness from searching container
          * @param node
-         */
+
         void removeNodeFromSet(TreeNodePtr node) override {
-            if(node == nullptr){
-                this->optimize_set[0].remove(node);
-                this->optimize_set[1].remove(node);
-                return;
-            }
 
             int tree_id = node->getTreeId()==TreeId::forward?0:1;
             if(node->getTreeNodeState() == TreeNodeState::in_optimize_set){
@@ -209,7 +205,7 @@ namespace acsr{
 
             }
             node->setTreeNodeState(TreeNodeState::not_in_set);
-        }
+        }*/
 
         Eigen::VectorXd getRandomReferencePoint(){
             //std::default_random_engine engine(_random_engine);
@@ -253,7 +249,7 @@ namespace acsr{
             if(time <= max_time){
                 //auto p = max_time/time;
                 //auto t = (1.0-p)*(1-p);
-                auto q = (time/max_time-1.0)/1.0;
+                auto q = (time/max_time-1.0)*50.0;
                 //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
                 //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + 0.1*std::pow(a,time-max_time)/(non_dominant_ref-non_dominant_state).norm();
                 //value = 1.0/(reference_state-state).norm();
@@ -264,7 +260,7 @@ namespace acsr{
             }else {
                 //auto p = time/max_time;
                 //auto t = (p-1.0)*(p-1)*(p-1);
-                auto q = Config::quality_decrease_factor*(max_time/time-1.0)/1.0;
+                auto q = Config::quality_decrease_factor*(max_time/time-1.0)*50.0;
                 //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
                 //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +0.1*std::pow(b,max_time-time)/(non_dominant_ref-non_dominant_state).norm();;
                 //value = 1.0/(reference_state-state).norm();
@@ -370,6 +366,7 @@ namespace acsr{
          * override connecting step
          */
         void connectingStep() override{
+            if(!_run_flag)return;
             if(!this->_is_optimized_connect)
                 return;
 
@@ -386,29 +383,27 @@ namespace acsr{
             double total_cost = std::numeric_limits<double>::max();
             auto it = this->optimize_set[index].begin();
             while(it!=this->optimize_set[index].end()){
-                if(*it == nullptr || (*it)->getTreeNodeState()==TreeNodeState::not_in_tree) {
-                    auto node = *it;
-                    it = this->optimize_set[index].erase(it);
-                    this->removePointFromContainer(node);
+                if(!_run_flag)return;
+                TreeNodePtr n = nullptr;
+                if((*it).expired()){
+                    it = optimize_set[index].erase(it);
                     continue;
                 }
-                auto temp_cost = chooseOtherNearestForOptimization(*it,temp_target);
-
+                n=it->lock();
+                if(n == nullptr || n->getTreeNodeState()==TreeNodeState::not_in_tree || n->getTreeNodeState()==TreeNodeState::not_in_set) {
+                    it = optimize_set[index].erase(it);
+                    continue;
+                }
+                auto temp_cost = chooseOtherNearestForOptimization(n,temp_target);
                 if(temp_target==nullptr || temp_cost>this->getMaxCost()){
-                    auto node = *it;
-                    (*it)->setTreeNodeState(TreeNodeState::not_in_set);
+                    n->setTreeNodeState(TreeNodeState::not_in_set);
                     it = this->optimize_set[index].erase(it);
                     continue;
-
-                    //node->setTreeNodeState(in_close_set);
-                    //it = this->optimize_set[index].erase(it);
-                    //close_map[index].insert({node,std::numeric_limits<double>::max()});
-                    //continue;
                 }
 
                 if(temp_cost < total_cost){
                     total_cost =temp_cost;
-                    explore_node = *it;
+                    explore_node = n;
                     target=temp_target;
                 }
                 ++it;
@@ -439,10 +434,13 @@ namespace acsr{
             bool optimized = this->_dynamic_system->connect(init_state, target_state,
                                                             Config::integration_step,
                                                             vec_state, vec_control,vec_duration);
+            if(!_run_flag)return;
             if(explore_node == nullptr || target == nullptr)
                 return;
 
-            removeNodeFromSet(explore_node);
+            //optimize_set[index].remove(explore_node);
+            explore_node->setTreeNodeState(TreeNodeState::not_in_set);
+
             if(!optimized){
                 return;
             }

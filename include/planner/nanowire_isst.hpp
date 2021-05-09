@@ -21,8 +21,8 @@ namespace acsr{
         /***
          * setup
          */
-        void setup() override {
-            SST::setup();
+        void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) override {
+            SST::setup(nanowire_config);
             double total_cost = this->_dynamic_system->getHeuristic(this->_init_state,this->_target_state);
 
             open_map[0].insert({this->_root,total_cost});
@@ -145,10 +145,10 @@ namespace acsr{
          * remove witness from searching container
          * @param node
          */
-        void removeNodeFromSet(TreeNodePtr node) override {
+        void removeNodeFromSet(TreeNodePtr node)  {
             if(node == nullptr){
-                this->optimize_set[0].erase(std::remove(begin(this->optimize_set[0]), end(this->optimize_set[0]), node), end(this->optimize_set[0]));
-                this->optimize_set[1].erase(std::remove(begin(this->optimize_set[1]), end(this->optimize_set[1]), node), end(this->optimize_set[1]));
+                //this->optimize_set[0].erase(std::remove(begin(this->optimize_set[0]), end(this->optimize_set[0]), node), end(this->optimize_set[0]));
+                //this->optimize_set[1].erase(std::remove(begin(this->optimize_set[1]), end(this->optimize_set[1]), node), end(this->optimize_set[1]));
 
                 open_map[0].erase(node);
                 open_map[1].erase(node);
@@ -158,10 +158,7 @@ namespace acsr{
             }
 
             int tree_id = node->getTreeId()==TreeId::forward?0:1;
-            if(node->getTreeNodeState() == TreeNodeState::in_optimize_set){
-                this->optimize_set[tree_id].erase(std::remove(begin(this->optimize_set[tree_id]), end(this->optimize_set[tree_id]), node), end(this->optimize_set[tree_id]));
-
-            }else if(node->getTreeNodeState() == TreeNodeState::in_open_set){
+            if(node->getTreeNodeState() == TreeNodeState::in_open_set){
                 open_map[tree_id].erase(node);
             }else if(node->getTreeNodeState() == TreeNodeState::in_close_set){
                 close_map[tree_id].erase(node);
@@ -346,7 +343,7 @@ namespace acsr{
 
         /***
          * override connecting step
-         */
+
         void connectingStep() override{
             if(!this->_is_optimized_connect)
                 return;
@@ -455,7 +452,7 @@ namespace acsr{
                 branchBound(this->_goal);
                 notifySolutionUpdate();
             }
-        }
+        }*/
     };
 }
 

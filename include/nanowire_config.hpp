@@ -7,7 +7,7 @@
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
 #include "nanowire_utility.hpp"
-
+#include <assert.h>
 namespace acsr {
     namespace po = boost::program_options;
     //USING_NAMESPACE_ACADO
@@ -121,6 +121,15 @@ namespace acsr {
      */
         int getNanowirePathIndex() const {
             return nanowire_index_for_image;
+        }
+
+        void setNanowireCount(int n_wire){
+            nanowire_count = n_wire;
+        }
+
+        void setZeta(const std::vector<double>& zeta){
+            assert(zeta.size() == 2*nanowire_count);
+            zeta_potential_vec = zeta;
         }
 
         /***
@@ -644,7 +653,7 @@ namespace acsr {
     double Config::quality_decrease_factor = 1.1;
 
     double Config::total_time = 600;
-    bool Config::show_node = false;
+    bool Config::show_node = true;
 
 
 }
