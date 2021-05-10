@@ -27,7 +27,7 @@ namespace acsr {
     using namespace brynet::net;
     using namespace brynet::base;
 
-    class TcpServer : public MessageDisplayer{
+    class TcpServer : public MessageDisplayer,public SolutionUpdateObserver{
     private:
         std::atomic_llong TotalSendLen = ATOMIC_VAR_INIT(0);
         std::atomic_llong TotalRecvLen = ATOMIC_VAR_INIT(0);
@@ -157,6 +157,26 @@ namespace acsr {
             for (auto &client:clients) {
                 client->send(new_msg.c_str(), new_msg.length());
             }
+
+        }
+
+        void onSolutionUpdate(const std::vector<Eigen::VectorXd> &forward_states,
+                              const std::vector<Eigen::VectorXd> &reverse_states,
+                              const std::vector<Eigen::VectorXd> &connect_states,
+                              const std::vector<Eigen::VectorXd> &forward_control,
+                              const std::vector<Eigen::VectorXd> &reverse_control,
+                              const std::vector<Eigen::VectorXd> &connect_control,
+                              const std::vector<double> &forward_durations,
+                              const std::vector<double> &reverse_durations,
+                              const std::vector<double> &connect_durations) override {
+            auto d = std::accumulate(forward_durations.begin(),forward_durations.end(),0.0);
+            d = std::accumulate(reverse_durations.begin(),reverse_durations.end(),d);
+            d = std::accumulate(connect_durations.begin(),connect_durations.end(),d);
+            std::string  s= "solution updated, cost: "+std::to_string(d) +"\r\n";
+            for (auto &client:clients) {
+                client->send(s.c_str(), s.length());
+            }
+
         }
 
 

@@ -13,8 +13,8 @@ namespace acsr {
 
     class SvgObserver : public SolutionUpdateObserver, public PlannerStartObserver, public NodeAddedObserver{
     private:
-        const std::vector<Color> colors =  { Color::Red, Color::Black, Color::Blue, Color::Brown, Color::Cyan, Color::Fuchsia,
-                                             Color::Green, Color::Lime, Color::Magenta, Color::Orange, Color::Purple, Color::Silver };
+        const std::vector<Color> colors =  { Color::Red, Color::Black, Color::Blue, Color::Fuchsia,
+                                             Color::Green, Color::Lime, Color::Orange, Color::Purple, Color::Silver,Color::Brown , Color::Magenta,  Color::Cyan};
         const std::vector<Color> node_colors={Color::Black,Color::Purple,Color::Orange,Color::Red};
         const double zoom = 1.0/3.0;
         std::string directory_name;

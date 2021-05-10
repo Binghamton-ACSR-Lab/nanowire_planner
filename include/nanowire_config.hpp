@@ -144,14 +144,14 @@ namespace acsr {
         Eigen::Vector2d electrodePositionToPosition(const Eigen::Vector2i& electrode_position){
             if(electrode_position(0) >= electrodes_row || electrode_position(0) <0 ||
                electrode_position(1) >= electrodes_column || electrode_position(1) < 0)return {-1.0,-1.0};
-            return {600e-6*electrode_position(1),600e-6*electrode_position(0)};
+            return {column_space*electrode_position(1),column_space*electrode_position(0)};
         }
 
         std::vector<Eigen::Vector2i> getNearElectrodes(const Eigen::Vector2d& pt){
-            int f0 = std::floor(pt(0)/600e-6);
-            int c0 = std::ceil(pt(0)/600e-6);
-            int f1 = std::floor(pt(1)/600e-6);
-            int c1 = std::ceil(pt(1)/600e-6);
+            int f0 = std::floor(pt(0)/column_space);
+            int c0 = std::ceil(pt(0)/column_space);
+            int f1 = std::floor(pt(1)/column_space);
+            int c1 = std::ceil(pt(1)/column_space);
             std::vector<Eigen::Vector2i> v={
                     {f1,f0},{c1,f0},{f1,c0},{c1,c0}
                     //{1,1},{1,1}

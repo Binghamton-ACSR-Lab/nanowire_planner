@@ -93,7 +93,7 @@ namespace acsr {
             });
 
             global_start_target.clear();
-            if(p.size()<15){
+            if(p.size()<5){
                 std::copy(p.begin(),p.end(),std::back_inserter(global_start_target));
             }else{
                 std::copy(p.begin(),p.begin()+15,std::back_inserter(global_start_target));
@@ -261,7 +261,7 @@ namespace acsr {
             const auto d_start = (_nanowire_config->electrodePositionToPosition(electrode_position)-nanowire_position).norm();
             uint index_start;
             for (index_start = 0; index_start<ref_time.getNumPoints();++index_start) {
-                if(600e-6-ref_time.getVector(index_start)(0)<d_start)
+                if(_nanowire_config->getColumnSpace()-ref_time.getVector(index_start)(0)<d_start)
                     break;
             }
             auto init_time = ref_time.getTime(index_start);
@@ -269,7 +269,7 @@ namespace acsr {
             single_state.addVector(nanowire_position,0.0);
 
             for (auto j = index_start+1; j<ref_time.getNumPoints();++j) {
-                DVector vec = nanowire_position + (d_start-(600e-6-ref_time.getVector(j)(0))) / d_start * (_nanowire_config->electrodePositionToPosition(electrode_position)-nanowire_position);
+                DVector vec = nanowire_position + (d_start-(_nanowire_config->getColumnSpace()-ref_time.getVector(j)(0))) / d_start * (_nanowire_config->electrodePositionToPosition(electrode_position)-nanowire_position);
                 single_state.addVector(vec,ref_time.getTime(j)-init_time);
             }
             return d_start;
@@ -286,7 +286,7 @@ namespace acsr {
             for (j = 0; j<ref_time.getNumPoints();++j) {
                 if(ref_time.getVector(j)(0)>d_end)
                     break;
-                DVector vec = start + ref_time.getVector(j)(0) / 600e-6 * (nanowire_position-start);
+                DVector vec = start + ref_time.getVector(j)(0) / _nanowire_config->getColumnSpace() * (nanowire_position-start);
                 single_state.addVector(vec,ref_time.getTime(j));
             }
             single_state.addVector(nanowire_position,ref_time.getTime(j+1));
@@ -301,7 +301,7 @@ namespace acsr {
             const auto target = _nanowire_config->electrodePositionToPosition(electrode_target);
             single_state.init();
             for (auto j = 0; j<ref_time.getNumPoints();++j) {
-                DVector vec = start + ref_time.getVector(j)(0) / 600e-6 * (target-start);
+                DVector vec = start + ref_time.getVector(j)(0) / _nanowire_config->getColumnSpace() * (target-start);
                 single_state.addVector(vec,ref_time.getTime(j));
             }
         }

@@ -22,15 +22,9 @@ namespace acsr {
 
     public:
         RunPlanner() {
-            forward_run_flag = false;
-            reverse_run_flag = false;
-            optimize_run_flag = false;
 
-            forward_stopped_flag = true;
-            reverse_stopped_flag = true;
-            optimize_stopped_flag = true;
 
-            is_running = false;
+            //is_running = false;
 
             ///start http server
             http_observer = std::make_shared<HttpServer>(8080);
@@ -44,6 +38,11 @@ namespace acsr {
             nanowire_config->readFile("config/nanowire.cfg");
             Config::readFile("config/planner.cfg");
             nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
+
+            tcp_server = std::make_shared<TcpServer> (6060);
+            auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
+            tcp_server->run(callback);
+            message_displayers.push_back(tcp_server);
         }
 
         void initFromTcp(){
@@ -109,9 +108,9 @@ namespace acsr {
 
             VariablesGrid vg;
             vg.read("reference_path.txt");
-            is_running = true;
+            //is_running = true;
             planner->notifyPlannerStart(getPlannerString(Config::planner),"img",vg);
-            while(is_running){
+            while(!exit_flag){
 
                 std::cout<<"planner is running\n Number of Node: ";
                 auto nodes_count = planner->getNumberOfNode();
@@ -122,7 +121,7 @@ namespace acsr {
                 auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop-start);
                 std::cout<<"duration: " << duration.count()<<"\n";
                 if(duration.count()>Config::total_time){
-                    is_running = false;
+                    exit_flag = true;
                     planner->stop();
                     break;
                 }
@@ -150,10 +149,7 @@ namespace acsr {
         }
 
         void runByTcp(){
-            auto server = std::make_shared<TcpServer> (6060);
-            auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
-            server->run(callback);
-            message_displayers.push_back(server);
+
             int v = 0;
             while(!exit_flag){
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -248,13 +244,117 @@ namespace acsr {
                     showMessage(temp_string);
                 }
                 //run_flag=true;
-                is_running = true;
+                //is_running = true;
                 startNewPlanner();
 
             }else if(strs[0]=="RESET"){
+                if(!run_flag){
+                    std::cout<<"planner not start!\n";
+                    showMessage("planner not start!");
+                    return;
+                }
+                if(strs.size()==1){
+                    std::cout<<"Wrong Command Format!!\n";
+                    showMessage("Wrong Command Format!!");
+                    return;
+                }
 
+                int n_wire;
+                try {
+                    n_wire = std::stoi(strs[1]);
+                }catch (std::invalid_argument& e){
+                    std::cout<<e.what()<<"\nWrong Command Format!!\n";
+                    showMessage("Wrong Command Format!!");
+                    return;
+                }
+                if(_n_wires!=n_wire){
+                    std::cout<<"\nWrong Command Format!!\n";
+                    showMessage("Wrong Command Format!!");
+                    return;
+                }
+
+                if(strs.size()!=4*_n_wires+2){
+                    std::cout<<"Wrong Command Format!!\n";
+                    showMessage("Wrong Command Format!!");
+                    return;
+                }
+
+                std::vector<double> temp_zeta(2*_n_wires);
+                std::vector<double> temp_init_states(2*_n_wires);
+
+                for (int i=0;i<2*_n_wires;i++) {
+                    try {
+                        temp_zeta[i] = std::stod(strs[2 + i]);
+                        temp_init_states[i] = std::stod(strs[2 + 2 * _n_wires + i])*1e-6;
+                    }catch(std::invalid_argument& e){
+                        std::cout<<e.what()<<"\nWrong Command Format!!\n";
+                        showMessage("Wrong Command Format!!");
+                        return;
+                    }
+                }
+
+                bool zeta_flag = true;
+                for (int i=0;i<2*_n_wires;i++) {
+                    if(std::abs(temp_zeta[i]-zeta[i])>0.01){
+                        zeta_flag = false;
+                        break;
+                    }
+                }
+
+                bool init_flag = true;
+                for (int i=0;i<2*_n_wires;i++) {
+                    if(std::abs(temp_init_states[i]-_init_states[i])>10e-6){
+                        init_flag = false;
+                        break;
+                    }
+                }
+
+                if(zeta_flag & init_flag){
+                    std::cout<<"reset parameters keeps the same! Ignored\n";
+                    showMessage("reset parameters keeps the same! Ignored");
+                    return;
+                }
+
+                {
+                    std::vector<std::string> msgs{"Reset new planner: "};
+                    msgs.push_back("nano wire count: " + std::to_string(_n_wires));
+                    for (int i = 0; i < _n_wires; i++) {
+                        msgs.push_back("--Nano Wire " + std::to_string(i + 1) + ": start point: " +
+                                       std::to_string(_init_states[2 * i]) + "," +
+                                       std::to_string(_init_states[2 * i + 1]));
+                    }
+                    std::string str = "Reset:\n--Zeta Potential: ";
+                    for (int i = 0; i < 2 * _n_wires; i++) {
+                        str.append(std::to_string(zeta[i]) + " ");
+                    }
+                    msgs.push_back(str);
+                    std::string temp_string;
+                    for (auto &s:msgs)
+                        temp_string += s+'\n';
+                    std::cout << temp_string;
+                    showMessage(temp_string);
+                }
+
+                if(zeta_flag){
+                    stop();
+                    _init_states = temp_init_states;
+                    zeta = temp_zeta;
+                    while(!forward_stopped_flag);
+                    while(!reverse_stopped_flag);
+                    while(!optimize_stopped_flag);
+                    startNewPlanner();
+                }else{
+                    stop();
+                    while(!forward_stopped_flag);
+                    while(!reverse_stopped_flag);
+                    while(!optimize_stopped_flag);
+                    startNewPlanner();
+                }
+                //run_flag=true;
+                //is_running = true;
+                //startNewPlanner();
             }else if(strs[0]=="STOP"){
-
+                stop();
             }else if(strs[0]=="EXIT"){
                 exit();
             }
@@ -318,10 +418,11 @@ namespace acsr {
         void stop(){
             if(planner)planner->stop();
             run_flag = false;
-            is_running = false;
+            //is_running = false;
             optimize_run_flag = false;
             forward_run_flag = false;
-            reverse_stopped_flag = false;
+            reverse_run_flag = false;
+            notify_flag = false;
         }
 
         void exit(){
@@ -358,6 +459,8 @@ namespace acsr {
             planner->registerPlannerStartObserver(http_observer);
             planner->registerNodeAddedObserver(svg_observer);
 
+            planner->registerSolutionUpdateObserver(tcp_server);
+
             planner->setup(nanowire_config);
             //std::cout<<"Goal Radius: "<<Config::goal_radius<<std::endl;
 
@@ -380,9 +483,10 @@ namespace acsr {
                 connecting_thread = std::thread(&RunPlanner::connecting,this);
                 connecting_thread.detach();
             }
-
+            while(!notify_stopped_flag){}
+            notify_flag = true;
             std::thread timer([this](){
-                while(forward_run_flag){
+                while(notify_flag){
                     std::cout<<"planner is running\n Number of Node: ";
                     auto nodes_count = planner->getNumberOfNode();
                     std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
@@ -391,7 +495,10 @@ namespace acsr {
 
                     svg_observer->update();
                     std::this_thread::sleep_for (std::chrono::seconds(2));
+                    notify_stopped_flag =false;
                 }
+                notify_stopped_flag = true;
+
             });
             timer.detach();
 
@@ -411,9 +518,9 @@ namespace acsr {
 
 
         ///running flags
-        std::atomic_bool forward_run_flag;
-        std::atomic_bool reverse_run_flag;
-        std::atomic_bool optimize_run_flag;
+        std::atomic_bool forward_run_flag{false};
+        std::atomic_bool reverse_run_flag{false};
+        std::atomic_bool optimize_run_flag{false};
 
         std::atomic_bool forward_stopped_flag{true};
         std::atomic_bool reverse_stopped_flag{true};
@@ -421,7 +528,11 @@ namespace acsr {
 
         std::atomic<bool> run_flag{false};
         std::atomic<bool> exit_flag{false};
-        std::atomic_bool is_running;
+
+        std::atomic<bool> notify_flag{false};
+        std::atomic<bool> notify_stopped_flag{true};
+
+        //std::atomic_bool is_running;
         ///observers
         std::shared_ptr<SvgObserver> svg_observer;
         //std::shared_ptr<BroadcastObserver> broad_observer;
@@ -435,6 +546,8 @@ namespace acsr {
         std::vector<double> _init_states;
         std::vector<double> _target_states;
         std::vector<std::shared_ptr<MessageDisplayer>> message_displayers;
+
+        std::shared_ptr<TcpServer> tcp_server;
 
     private:
         void showMessage(const std::string& msg){
