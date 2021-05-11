@@ -129,7 +129,7 @@ namespace acsr {
             duration = std::accumulate(connect_durations.begin(), connect_durations.end(), duration);
 
             update_history.push_back({system_clock::now(), duration});
-            ss << R"( <table style="width:50%">
+            ss << R"( <table id = "solution_history" style="width:50%">
                 <tr>
                     <th>update time</th>
                     <th>duration</th>
@@ -151,7 +151,7 @@ namespace acsr {
 
             ///last solution table;
             ss.clear();
-            ss << R"( <table style="width:100%">
+            ss << R"( <table id = "last_solution" style="width:100%">
                 <tr>
                 )";
             ///table head
@@ -276,6 +276,33 @@ namespace acsr {
             ss << R"( </table> )";
             last_solution_table = ss.str();
 
+            ///response solution table;
+            {
+                std::stringstream ss;
+                for (auto index = 0; index < forward_states.size(); ++index) {
+                    for (auto i = 0; i < forward_states[index].size(); ++i) {
+                        ss << forward_states[index][i]*1e6 << '\t';
+                    }
+                    ss << forward_durations[index] << '\n';
+                }
+                ///connect tree information
+                for (auto index = 0; index < connect_states.size(); ++index) {
+                    for (auto i = 0; i < connect_states[index].size(); ++i) {
+                        ss << connect_states[index][i]*1e6 << '\t';
+                    }
+                    ss << connect_durations[index] << '\n';
+                }
+
+                ///connect tree information
+                for (auto index = 0; index < reverse_states.size(); ++index) {
+                    for (auto i = 0; i < reverse_states[index].size(); ++i) {
+                        ss << reverse_states[index][i]*1e6 << '\t';
+                    }
+                    ss << reverse_durations[index] << '\n';
+                }
+                response_solution_table = ss.str();
+            }
+
             //setData(parameter_table + solution_update_table + last_solution_table);
         }
 
@@ -292,21 +319,60 @@ namespace acsr {
         /***
          * @brief start a new thread and run http server
          */
-        void runServer() {
+        template<class F>
+        void run(F f) {
 
             if (run_flag) {
                 std::cout << "server is running\n";
                 return;
             }
             run_flag = true;
-            std::thread t([this]() {
+            std::thread t([this,f]() {
                 auto service = TcpService::Create();
                 service->startWorkerThread(3);
 
-                auto httpEnterCallback = [this](const brynet::net::http::HTTPParser &httpParser,
+                auto httpEnterCallback = [this,f](const brynet::net::http::HTTPParser &httpParser,
                                                 const brynet::net::http::HttpSession::Ptr &session) {
-                    (void) httpParser;
+                    //(void) httpParser;
                     brynet::net::http::HttpResponse response;
+                    auto cmd = httpParser.getBody();
+                    boost::to_upper(cmd);
+                    if(!cmd.empty()){
+                        if(cmd.find("SOLUTION")!=std::string::npos){
+                            response.setBody(response_solution_table);
+                            std::string result = response.getResult();
+                            session->send(result.c_str(), result.size(), [session]() {
+                                session->postShutdown();
+                            });
+                            return;
+
+                        }else if(cmd.find("TIME")!=std::string::npos){
+                            if(update_history.empty()){
+                                response.setBody("-1 -1");
+                                std::string result = response.getResult();
+                                session->send(result.c_str(), result.size(), [session]() {
+                                    session->postShutdown();
+                                });
+                                return;
+                            }else{
+                                response.setBody(std::to_string((update_history.back().first-start_time).count()/1e9)+'\t'+std::to_string(update_history.back().second));
+                                std::string result = response.getResult();
+                                session->send(result.c_str(), result.size(), [session]() {
+                                    session->postShutdown();
+                                });
+                                return ;
+                            }
+
+                        }else{
+                            auto msg = f(cmd.c_str(),cmd.size());
+                            response.setBody(msg);
+                            std::string result = response.getResult();
+                            session->send(result.c_str(), result.size(), [session]() {
+                                session->postShutdown();
+                            });
+                            return;
+                        }
+                    }
 
                     std::string body = R"(
                 <!DOCTYPE html>
@@ -385,6 +451,14 @@ namespace acsr {
             run_flag = false;
         }
 
+        void reset(){
+            update_history.clear();
+            parameter_table = "No data";
+            response_solution_table = "no solution";
+            solution_update_table="";
+            last_solution_table="";
+        }
+
     private:
         int port;
         std::vector<std::pair<time_point<system_clock, duration<long int, std::ratio<1, 1000000000>>>, double>> update_history;
@@ -392,6 +466,7 @@ namespace acsr {
         std::string parameter_table = "No data.";
         std::string solution_update_table;
         std::string last_solution_table;
+        std::string response_solution_table = "no solution";
         std::atomic_bool run_flag = false;
         std::string svg_element;
     };

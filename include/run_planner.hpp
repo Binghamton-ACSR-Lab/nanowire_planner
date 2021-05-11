@@ -27,9 +27,7 @@ namespace acsr {
             //is_running = false;
 
             ///start http server
-            http_observer = std::make_shared<HttpServer>(8080);
-            http_observer->runServer();
-            svg_observer = std::make_shared<SvgObserver>();
+
         };
 
         void init(){
@@ -39,9 +37,13 @@ namespace acsr {
             Config::readFile("config/planner.cfg");
             nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
 
-            tcp_server = std::make_shared<TcpServer> (6060);
             auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
+            tcp_server = std::make_shared<TcpServer> (6060);
             tcp_server->run(callback);
+
+            http_observer = std::make_shared<HttpServer>(8080);
+            svg_observer = std::make_shared<SvgObserver>();
+            http_observer->run(callback);
             message_displayers.push_back(tcp_server);
         }
 
@@ -53,6 +55,7 @@ namespace acsr {
 
 
 
+            http_observer->reset();
             planner = PlannerBuilder::create(Config::planner,nanowire_system);
 
 ///necessary setting
@@ -163,8 +166,9 @@ namespace acsr {
         }
 
 
-        void parseCommand(const char* buffer,size_t size){
+        std::string parseCommand(const char* buffer,size_t size){
             std::string s(buffer,size);
+            std::string msg;
             boost::to_upper(s);
             boost::trim(s);
             std::vector<std::string> strs;
@@ -184,28 +188,32 @@ namespace acsr {
             strs.push_back(s.substr(start, end));*/
             if(strs[0]=="START"){
                 if(run_flag){
-                    std::cout<<"planner is running!\n";
-                    showMessage("planner is running!\n");
-                    return;
+                    msg = "planner is running!";
+                    std::cout<<msg<<'\n';
+                    showMessage(msg);
+                    return msg;
                 }
                 if(strs.size()==1){
-                    std::cout<<"Wrong Command Format!!\n";
-                    showMessage("Wrong Command Format!!\n");
-                    return;
+                    msg = "Wrong Command Format!!";
+                    std::cout<<msg<<'\n';
+                    showMessage(msg);
+                    return msg;
                 }
 
                 try {
                     _n_wires = std::stoi(strs[1]);
                 }catch (std::invalid_argument& e){
-                    std::cout<<e.what()<<"\nWrong Command Format!!\n";
-                    showMessage("Wrong Command Format!!\n");
-                    return;
+                    msg = std::string(e.what()) + "\nWrong Command Format!!";
+                    std::cout<<msg<<'\n';
+                    showMessage(msg);
+                    return msg;
                 }
 
                 if(_n_wires == 0 || strs.size()!=6*_n_wires+2){
-                    std::cout<<"Wrong Command Format!!\n";
-                    showMessage("Wrong Command Format!!\n");
-                    return;
+                    msg = "Wrong Command Format!!";
+                    std::cout<<msg<<'\n';
+                    showMessage(msg);
+                    return msg;
                 }
 
                 zeta.resize(2*_n_wires);
@@ -217,11 +225,14 @@ namespace acsr {
                         _init_states[i] = std::stod(strs[2 + 2 * _n_wires + i])*1e-6;
                         _target_states[i] = std::stod(strs[2 + 4 * _n_wires + i])*1e-6;
                     }catch(std::invalid_argument& e){
-                        std::cout<<e.what()<<"\nWrong Command Format!!\n";
-                        return;
+                        msg = std::string(e.what()) + "\nWrong Command Format!!";
+                        std::cout<<msg<<'\n';
+                        showMessage(msg);
+                        return msg;
                     }
                 }
 
+                msg ="";
                 {
                     std::vector<std::string> msgs{"Starting new planner: "};
                     msgs.push_back("nano wire count: " + std::to_string(_n_wires));
@@ -237,46 +248,52 @@ namespace acsr {
                         str.append(std::to_string(zeta[i]) + " ");
                     }
                     msgs.push_back(str);
-                    std::string temp_string;
                     for (auto &s:msgs)
-                        temp_string += s+'\n';
-                    std::cout << temp_string;
-                    showMessage(temp_string);
+                        msg += s+'\n';
+                    std::cout << msg;
+                    showMessage(msg);
                 }
                 //run_flag=true;
                 //is_running = true;
-                startNewPlanner();
+                std::thread t(&RunPlanner::startNewPlanner,this);
+                t.detach();
+                return msg;
 
             }else if(strs[0]=="RESET"){
                 if(!run_flag){
-                    std::cout<<"planner not start!\n";
-                    showMessage("planner not start!");
-                    return;
+                    msg = "planner not start!";
+                    std::cout<<msg<<'\n';
+                    showMessage(msg);
+                    return msg;
                 }
                 if(strs.size()==1){
-                    std::cout<<"Wrong Command Format!!\n";
-                    showMessage("Wrong Command Format!!");
-                    return;
+                    msg = "Wrong Command Format!!";
+                    std::cout<<msg<<'\n';
+                    showMessage(msg);
+                    return msg;
                 }
 
                 int n_wire;
                 try {
                     n_wire = std::stoi(strs[1]);
                 }catch (std::invalid_argument& e){
-                    std::cout<<e.what()<<"\nWrong Command Format!!\n";
-                    showMessage("Wrong Command Format!!");
-                    return;
+                    msg = std::string(e.what()) + "\nWrong Command Format!!";
+                    std::cout<<msg<<'\n';
+                    showMessage(msg);
+                    return msg;
                 }
                 if(_n_wires!=n_wire){
-                    std::cout<<"\nWrong Command Format!!\n";
-                    showMessage("Wrong Command Format!!");
-                    return;
+                    msg = "Wrong Command Format!!";
+                    std::cout<<msg<<'\n';
+                    showMessage(msg);
+                    return msg;
                 }
 
                 if(strs.size()!=4*_n_wires+2){
-                    std::cout<<"Wrong Command Format!!\n";
-                    showMessage("Wrong Command Format!!");
-                    return;
+                    msg = "Wrong Command Format!!";
+                    std::cout<<msg<<'\n';
+                    showMessage(msg);
+                    return msg;
                 }
 
                 std::vector<double> temp_zeta(2*_n_wires);
@@ -287,9 +304,10 @@ namespace acsr {
                         temp_zeta[i] = std::stod(strs[2 + i]);
                         temp_init_states[i] = std::stod(strs[2 + 2 * _n_wires + i])*1e-6;
                     }catch(std::invalid_argument& e){
-                        std::cout<<e.what()<<"\nWrong Command Format!!\n";
-                        showMessage("Wrong Command Format!!");
-                        return;
+                        msg = std::string(e.what()) + "\nWrong Command Format!!";
+                        std::cout<<msg<<'\n';
+                        showMessage(msg);
+                        return msg;
                     }
                 }
 
@@ -310,11 +328,13 @@ namespace acsr {
                 }
 
                 if(zeta_flag & init_flag){
-                    std::cout<<"reset parameters keeps the same! Ignored\n";
+                    msg = "reset parameters keeps the same! Ignored\n";
+                    std::cout<<msg<<'\n';
                     showMessage("reset parameters keeps the same! Ignored");
-                    return;
+                    return msg;
                 }
 
+                msg = "";
                 {
                     std::vector<std::string> msgs{"Reset new planner: "};
                     msgs.push_back("nano wire count: " + std::to_string(_n_wires));
@@ -328,11 +348,12 @@ namespace acsr {
                         str.append(std::to_string(zeta[i]) + " ");
                     }
                     msgs.push_back(str);
-                    std::string temp_string;
+
                     for (auto &s:msgs)
-                        temp_string += s+'\n';
-                    std::cout << temp_string;
-                    showMessage(temp_string);
+                        msg += s+'\n';
+                    std::cout << msg;
+                    showMessage(msg);
+
                 }
 
                 if(zeta_flag){
@@ -342,25 +363,32 @@ namespace acsr {
                     while(!forward_stopped_flag);
                     while(!reverse_stopped_flag);
                     while(!optimize_stopped_flag);
-                    startNewPlanner();
+                    std::thread t(&RunPlanner::startNewPlanner,this);
+                    t.detach();
+                    return msg;
                 }else{
                     stop();
                     while(!forward_stopped_flag);
                     while(!reverse_stopped_flag);
                     while(!optimize_stopped_flag);
-                    startNewPlanner();
+                    std::thread t(&RunPlanner::startNewPlanner,this);
+                    t.detach();
+                    return msg;
                 }
                 //run_flag=true;
                 //is_running = true;
                 //startNewPlanner();
             }else if(strs[0]=="STOP"){
                 stop();
+                return "planner stopped";
             }else if(strs[0]=="EXIT"){
                 exit();
+                return "program exit";
             }
             else{
                 std::cout<<"Receive Wrong Command!\n";
                 showMessage("Receive Wrong Command!");
+                return "Receive Wrong Command!";
             }
 
         }
@@ -440,6 +468,8 @@ namespace acsr {
             }
 
             //read config files
+
+            http_observer->reset();
 
             nanowire_config->readFile("config/nanowire.cfg");
             nanowire_config->setNanowireCount(_n_wires);

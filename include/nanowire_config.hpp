@@ -15,6 +15,7 @@ namespace acsr {
     class NanowireConfig {
     private:
 
+        std::string type;
         double row_space;///electrodes row space
 
         double column_space;///electrodes column space
@@ -57,6 +58,10 @@ namespace acsr {
      */
         double getRowSpace() const {
             return row_space;
+        }
+
+        std::string getType() const{
+            return type;
         }
 
         /***
@@ -174,8 +179,9 @@ namespace acsr {
             opt_desc.add_options()
                     ("nanowire_count", po::value<int>()->default_value(3), "nanowire count")
                     ("zeta_potential", po::value<std::string>()->default_value("1 1 1 1"), "zeta potential.")
-                    ("row_space", po::value<double>()->default_value(600), "row space.")
-                    ("column_space", po::value<double>()->default_value(600),"column space")
+                    ("type", po::value<std::string>()->default_value("cc600"), "electrode system type")
+                    //("row_space", po::value<double>()->default_value(600), "row space.")
+                    //("column_space", po::value<double>()->default_value(600),"column space")
                     ("electrodes_row", po::value<int>()->default_value(4), "electordes row")
                     ("electrodes_column", po::value<int>()->default_value(4),"electrodes column")
                     ("field_data_rows", po::value<int>()->default_value(181),"")
@@ -199,7 +205,15 @@ namespace acsr {
                 std::cout << "Nanowire Config File Error\n";
             }
 
+             if (varmap.count("type")) {
+                 type = varmap["type"].as<std::string>();
+                 row_space = std::stod(type.substr(2))*1e-6;
+                 column_space = std::stod(type.substr(2))*1e-6;
+             } else {
+                 std::cout << "Nanowire Config File Error\n";
+             }
 
+/*
             if (varmap.count("row_space")) {
                 row_space = varmap["row_space"].as<double>() * 1e-6;
             } else {
@@ -211,7 +225,7 @@ namespace acsr {
             } else {
                 std::cout << "Nanowire Config File Error\n";
             }
-
+*/
             if (varmap.count("electrodes_row")) {
                 electrodes_row = varmap["electrodes_row"].as<int>();
             } else {

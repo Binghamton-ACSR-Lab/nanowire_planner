@@ -20,9 +20,24 @@ namespace acsr {
         virtual ~GlobalPath() = default;
 
         bool init(const Eigen::VectorXd &init_state, const Eigen::VectorXd &target_state,std::shared_ptr<NanowireConfig> nanowire_config) {
-            if (!boost::filesystem::exists("data/reference cost.txt"))
-                return false;
-            ref_time.read("data/reference cost.txt");
+
+            if(nanowire_config->getType()=="cc600") {
+                if (!boost::filesystem::exists("data/reference_speed_cc600.txt")) {
+                    std::cout << "Reference data for cc600 is missing";
+                    return false;
+                }
+                ref_time.read("data/reference_speed_cc600.txt");
+            }else if(nanowire_config->getType()=="cc60"){
+                if (!boost::filesystem::exists("data/reference_speed_cc60.txt")) {
+                    std::cout << "Reference data for cc60 is missing";
+                    return false;
+                }
+                ref_time.read("data/reference_speed_cc60.txt");
+                for (auto i = 0; i < ref_time.getNumPoints(); ++i) {
+                    ref_time.setVector(i,ref_time.getVector(i)*1e-6);
+                }
+                ref_time.print(std::cout);
+            }
 
             _n_wires = nanowire_config->getNanowireCount();
             _init_state = init_state;
@@ -96,7 +111,7 @@ namespace acsr {
             if(p.size()<5){
                 std::copy(p.begin(),p.end(),std::back_inserter(global_start_target));
             }else{
-                std::copy(p.begin(),p.begin()+15,std::back_inserter(global_start_target));
+                std::copy(p.begin(),p.begin()+5,std::back_inserter(global_start_target));
             }
             /*
             auto v = *std::min_element(p.begin(),p.end(),[&](const std::pair<ElectordePositionType,ElectordePositionType>& elem1,const std::pair<ElectordePositionType,ElectordePositionType>& elem2){
@@ -172,7 +187,6 @@ namespace acsr {
 
             }
             return electrodes_paths;
-
         }
 
         void generateBestReferenceTrajectory(VariablesGrid& states){
@@ -229,8 +243,6 @@ namespace acsr {
             for(uint j=0;j<temp_state.getNumPoints();++j){
                 states.addVector(temp_state.getVector(j),init_time+temp_state.getTime(j));
             }
-
-
         }
 
 

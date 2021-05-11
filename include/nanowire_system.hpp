@@ -66,7 +66,7 @@ namespace acsr {
         const double _e0 = 8.85e-12;
         const double _em = 2.17 * _e0;
         const double _mu = 216.95e-3;
-        const double _wire_radius = 10e-6;
+        const double _wire_radius = 5e-6;
 
         //std::shared_ptr<ReferencePath> reference_path;
 
@@ -345,7 +345,7 @@ namespace acsr {
      */
         double getHeuristic(const Eigen::VectorXd &state1, const Eigen::VectorXd &state2)  {
             ///1200e-6/100 is the max velocity;
-            return maxDistance(state1, state2) / (1200e-6 / 100);
+            return maxDistance(state1, state2) ;
         }
 
         /***
@@ -425,7 +425,11 @@ namespace acsr {
                                                  [](double &aa, double &bb) {
                                                      return (std::abs(aa) < std::abs(bb));
                                                  });
-            double int_step_max = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * int_step;
+            double int_step_max;
+            if(_nanowire_config->getType()=="cc60")
+                int_step_max = std::max((0.05 / std::abs(*max_theta_pt)), 0.1) * int_step;
+            else if(_nanowire_config->getType()=="cc600")
+                int_step_max = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * int_step;
 
 
             if (!optimize(x0, xt, int_step_max, states, controls)) {
@@ -500,7 +504,7 @@ namespace acsr {
                     ocp.subjectTo(_state_low_bound(n) <= x(n) <= _state_upper_bound(n));
                 }
                 ///maximum time
-                ocp.subjectTo(int_step <= T <= 500);
+                ocp.subjectTo(int_step <= T <= 200);
 
                 ///define algorithm as solve
                 ACADO::OptimizationAlgorithm algorithm(ocp);

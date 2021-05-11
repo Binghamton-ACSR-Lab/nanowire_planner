@@ -48,8 +48,8 @@ namespace acsr {
          */
         void setNanowireConfig(const std::shared_ptr<NanowireConfig>& config){
             _nanowire_config = config;
-            width = _nanowire_config->getColumnSpace()*(_nanowire_config->getElectrodesCols()-1) *1e6*zoom;
-            height = _nanowire_config->getRowSpace()*(_nanowire_config->getElectrodesRows()-1) *1e6*zoom;
+            width = 600*(_nanowire_config->getElectrodesCols()-1) *zoom;
+            height = 600*(_nanowire_config->getElectrodesRows()-1) *zoom;
 
         }
 
@@ -261,9 +261,9 @@ namespace acsr {
          */
         inline Point convertStateToImagePoint(const Eigen::VectorXd &state, int robot_index) {
             return Point(
-                    1e6 * zoom * (state(robot_index * 2) ) +
+                    zoom * (state(robot_index * 2)*600/_nanowire_config->getColumnSpace() ) +
                     0.05 * width,
-                    1e6 * zoom * (state(robot_index * 2 + 1) ) +
+                    zoom * (state(robot_index * 2 + 1)*600/_nanowire_config->getColumnSpace() ) +
                     0.05 * height
             );
         }
