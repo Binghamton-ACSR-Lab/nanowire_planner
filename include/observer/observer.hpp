@@ -89,9 +89,15 @@ namespace acsr {
                 double stop_value,
                 double goal_radius,
                 double step_size,
-                int min_steps,int max_steps, double sst_delta_near, double sst_delta_drain,
+                int min_steps,
+                int max_steps,
+                double sst_delta_near,
+                double sst_delta_drain,
                 double optimization_distance,
-                int m,int n,int dominant_path_count,double quality_decrease_factor,
+                int m,
+                int n,
+                int dominant_path_count,
+                double quality_decrease_factor,
                 const std::string& image_name
         ) =0;
 

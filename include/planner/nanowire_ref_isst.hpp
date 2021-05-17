@@ -67,9 +67,9 @@ namespace acsr{
             std::uniform_real_distribution<double> distribution(0.0,1.0);
             auto p = distribution(_random_engine);
             parent = nullptr;
-            if(p<0.5){
+            if(p<PlannerConfig::search_p){
                 auto point = getRandomReferencePoint();
-                auto near = getNearNodeByRadiusAndNearest(point,tree_id,50e-6);
+                auto near = getNearNodeByRadiusAndNearest(point,tree_id,PlannerConfig::sst_delta_near);
                 parent = std::static_pointer_cast<TreeNode>(near.second);
                 if(!near.first.empty()) {
                     auto it = std::min_element(near.first.begin(), near.first.end(),
@@ -109,7 +109,6 @@ namespace acsr{
             std::map<double,PropagateParameters> quality_map;
             Eigen::VectorXd temp_state;
             double temp_duration;
-            //auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_goal->getState());
 
             ///propagate M times and select a best node with least estimated solution cost
             for(int i=0;i<PlannerConfig::blossomM;i++) {
@@ -149,7 +148,6 @@ namespace acsr{
             Eigen::VectorXd temp_state;
             std::map<double,PropagateParameters> quality_map;
             double temp_duration;
-            //auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_root->getState());
 
             for(int i=0;i<PlannerConfig::blossomM;i++) {
                 if(!_run_flag)return false;
@@ -171,24 +169,7 @@ namespace acsr{
             return return_value;
         }
 
-
-
-        /***
-         * remove witness from searching container
-         * @param node
-
-        void removeNodeFromSet(TreeNodePtr node) override {
-
-            int tree_id = node->getTreeId()==TreeId::forward?0:1;
-            if(node->getTreeNodeState() == TreeNodeState::in_optimize_set){
-                this->optimize_set[tree_id].erase(std::remove(begin(this->optimize_set[tree_id]), end(this->optimize_set[tree_id]), node), end(this->optimize_set[tree_id]));
-
-            }
-            node->setTreeNodeState(TreeNodeState::not_in_set);
-        }*/
-
         Eigen::VectorXd getRandomReferencePoint(){
-            //std::default_random_engine engine(_random_engine);
             std::uniform_int_distribution<int> distribution(0,reference_path->getStates().getNumPoints()-1);
             auto index = distribution(_random_engine);
             return reference_path->getStates().getVector(index);
@@ -225,60 +206,32 @@ namespace acsr{
                     non_dominant_ref(2*k+1) = reference_state(2*i+1);
                     non_dominant_state(2*k) = state(2*i);
                     non_dominant_state(2*k+1) = state(2*i+1);
-                    //non_dominant_target(2*k) = target(2*i);
-                    //non_dominant_target(2*k+1) = target(2*i+1);
                     k++;
                 }
             }
 
-
-            double mul = 100.0;
-            auto c = M_E/10.0;
             if(time <= max_time){
-                //auto p = max_time/time;
-                //auto t = (1.0-p)*(1-p);
                 auto q = (time/max_time-1.0)*PlannerConfig::quality_factor;
-                //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
-                //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + 0.1*std::pow(a,time-max_time)/(non_dominant_ref-non_dominant_state).norm();
-                //value = 1.0/(reference_state-state).norm();
-                //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + mul*(non_dominant_ref-non_dominant_state).norm();
-                //value = std::pow(c,q)/(dominant_ref-dominant_state).norm() + 0.5*std::pow(c,q)/(non_dominant_ref-non_dominant_state).norm();
                 auto z = std::exp(q);
                 value = z/(dominant_ref-dominant_state).norm();//+0.001 * z/(non_dominant_ref-non_dominant_state).norm();
             }else {
-                //auto p = time/max_time;
-                //auto t = (p-1.0)*(p-1)*(p-1);
                 auto q = PlannerConfig::quality_decrease_factor*(max_time/time-1.0)*PlannerConfig::quality_factor;
-                //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
-                //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +0.1*std::pow(b,max_time-time)/(non_dominant_ref-non_dominant_state).norm();;
-                //value = 1.0/(reference_state-state).norm();
-                //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +mul*(non_dominant_ref-non_dominant_state).norm();
-                //value = std::pow(c,q)/(dominant_ref-dominant_state).norm() +0.5*std::pow(c,q)/(non_dominant_ref-non_dominant_state).norm();
                 auto z = std::exp(q);
                 value = z/(dominant_ref-dominant_state).norm();//+0.001 * z/(non_dominant_ref-non_dominant_state).norm();
             }
             return value;
         }
 
-
-
     public:
         explicit RefSST(std::shared_ptr<NanowireSystem> dynamic_system):SST(dynamic_system){
-
         }
 
         RefSST()=delete;
         RefSST(const RefSST&) = delete;
 
         ~RefSST() override{
-            //this->forward_prox_container.clear();
-            //this->reverse_prox_container.clear();
             this->forward_tree.clear();
             this->reverse_tree.clear();
-            //open_map[0].clear();
-            //open_map[1].clear();
-            //close_map[0].clear();
-            //close_map[1].clear();
             optimize_set.clear();
         }
 
