@@ -223,9 +223,17 @@ namespace acsr {
      */
         Eigen::VectorXd randomControl() {
             Eigen::VectorXd control(_control_dimension);
-            for (auto i = 0; i < _control_dimension; ++i)
-                control(i) = randomInteger(_control_low_bound(i),_control_upper_bound(i));
-            return control;
+            if(Config::intermedia_control) {
+                for (auto i = 0; i < _control_dimension; ++i)
+                    control(i) = randomDouble(_control_low_bound(i),_control_upper_bound(i));
+                double p = 1.0 / control.maxCoeff();
+                return p*control;
+            }else{
+                for (auto i = 0; i < _control_dimension; ++i)
+                    control(i) = randomInteger(_control_low_bound(i),_control_upper_bound(i));
+                return control;
+            }
+            //return control;
         }
 
         /***
@@ -246,7 +254,14 @@ namespace acsr {
                                                  [](double &aa, double &bb) {
                                                      return (std::abs(aa) < std::abs(bb));
                                                  });
-            double int_step = std::max(int(std::round(1.0 / std::abs(*max_theta_pt))), 1) * step_length;
+
+            //double int_step_max;
+            if(_nanowire_config->getType()=="cc60")
+                step_length = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * step_length;
+            else if(_nanowire_config->getType()=="cc600")
+                step_length = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * step_length;
+
+            //double int_step = std::max(int(std::round(1.0 / std::abs(*max_theta_pt))), 1) * step_length;
 
             for (auto i = 0; i < steps; ++i) {
                 for (int k = 0; k < nanowire_count; k++) {
@@ -255,12 +270,12 @@ namespace acsr {
                 }
                 _field->getField(x, y, mat_E, nanowire_count);
                 auto mat_velocity = _mat_theta * mat_E * control * _em / _mu;
-                result_state += int_step * mat_velocity;
+                result_state += step_length * mat_velocity;
                 //MAX_VELOCITY = MAX_VELOCITY > mat_velocity.norm()/wire_count ? MAX_VELOCITY : mat_velocity.norm()/wire_count;
                 if (!validState(result_state))
                     return false;
             }
-            duration = steps * int_step;
+            duration = steps * step_length;
             return true;
         }
 
@@ -311,7 +326,10 @@ namespace acsr {
                                                  [](double &aa, double &bb) {
                                                      return (std::abs(aa) < std::abs(bb));
                                                  });
-            double int_step = std::max(int(std::round(1.0 / std::abs(*max_theta_pt))), 1) * step_length;
+            if(_nanowire_config->getType()=="cc60")
+                step_length = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * step_length;
+            else if(_nanowire_config->getType()=="cc600")
+                step_length = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * step_length;
             int step = 0;
             duration = 0;
             while (distance(init_state, result_state) < max_distance) {
@@ -321,11 +339,11 @@ namespace acsr {
                 }
                 _field->getField(x, y, mat_E, nanowire_count);
                 auto mat_velocity = _mat_theta * mat_E * control * _em / _mu;
-                result_state += int_step * mat_velocity;
+                result_state += step_length * mat_velocity;
                 if (!validState(result_state))
                     return false;
             }
-            duration = step * int_step;
+            duration = step * step_length;
             return true;
         }
 
@@ -345,7 +363,7 @@ namespace acsr {
      */
         double getHeuristic(const Eigen::VectorXd &state1, const Eigen::VectorXd &state2)  {
             ///1200e-6/100 is the max velocity;
-            return maxDistance(state1, state2) ;
+            return maxDistance(state1, state2) /1e-5;
         }
 
         /***
@@ -427,7 +445,7 @@ namespace acsr {
                                                  });
             double int_step_max;
             if(_nanowire_config->getType()=="cc60")
-                int_step_max = std::max((0.05 / std::abs(*max_theta_pt)), 0.1) * int_step;
+                int_step_max = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * int_step;
             else if(_nanowire_config->getType()=="cc600")
                 int_step_max = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * int_step;
 
@@ -504,7 +522,7 @@ namespace acsr {
                     ocp.subjectTo(_state_low_bound(n) <= x(n) <= _state_upper_bound(n));
                 }
                 ///maximum time
-                ocp.subjectTo(int_step <= T <= 200);
+                ocp.subjectTo(int_step <= T <= 400);
 
                 ///define algorithm as solve
                 ACADO::OptimizationAlgorithm algorithm(ocp);

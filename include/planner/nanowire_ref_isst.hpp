@@ -129,7 +129,7 @@ namespace acsr{
             std::map<double,PropagateParameters> quality_map;
             Eigen::VectorXd temp_state;
             double temp_duration;
-            auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_goal->getState());
+            //auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_goal->getState());
 
             ///propagate M times and select a best node with least estimated solution cost
             for(int i=0;i<Config::blossomM;i++) {
@@ -139,7 +139,7 @@ namespace acsr{
                 if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,Config::integration_step,
                                                                    steps,temp_state,temp_duration)){
                     return_value = true;
-                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state)] =
+                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::forward)] =
                             PropagateParameters {temp_state,temp_control,temp_duration};
                 }
             }
@@ -169,7 +169,7 @@ namespace acsr{
             Eigen::VectorXd temp_state;
             std::map<double,PropagateParameters> quality_map;
             double temp_duration;
-            auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_root->getState());
+            //auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_root->getState());
 
             for(int i=0;i<Config::blossomM;i++) {
                 if(!_run_flag)return false;
@@ -178,7 +178,7 @@ namespace acsr{
                 if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,Config::integration_step,
                                                                    steps,temp_state,temp_duration)){
                     return_value = true;
-                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state)] =
+                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::reverse)] =
                             PropagateParameters {temp_state,temp_control,temp_duration};
                 }
             }
@@ -214,10 +214,18 @@ namespace acsr{
             return reference_path->getStates().getVector(index);
         }
 
-        double getQuality(double time,  const Eigen::VectorXd &state){
+        double getQuality(double time,  const Eigen::VectorXd &state, const TreeId treeid){
             double value;
             auto max_time = reference_path->getMaxTime();
-            Eigen::VectorXd reference_state = reference_path->getState(time);
+            Eigen::VectorXd reference_state;
+            if(treeid==TreeId::forward)
+                reference_state= reference_path->getState(time);
+            else if(treeid==TreeId::reverse){
+                if(time<max_time)
+                    reference_state = reference_path->getState(max_time-time);
+                else
+                    reference_state= reference_path->getState(0);
+            }
             Eigen::VectorXd dominant_ref(2*_dominant_index.size());
             Eigen::VectorXd dominant_state(2*_dominant_index.size());
 
@@ -249,7 +257,7 @@ namespace acsr{
             if(time <= max_time){
                 //auto p = max_time/time;
                 //auto t = (1.0-p)*(1-p);
-                auto q = (time/max_time-1.0)*50.0;
+                auto q = (time/max_time-1.0)*Config::quality_factor;
                 //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
                 //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + 0.1*std::pow(a,time-max_time)/(non_dominant_ref-non_dominant_state).norm();
                 //value = 1.0/(reference_state-state).norm();
@@ -260,7 +268,7 @@ namespace acsr{
             }else {
                 //auto p = time/max_time;
                 //auto t = (p-1.0)*(p-1)*(p-1);
-                auto q = Config::quality_decrease_factor*(max_time/time-1.0)*50.0;
+                auto q = Config::quality_decrease_factor*(max_time/time-1.0)*Config::quality_factor;
                 //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
                 //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +0.1*std::pow(b,max_time-time)/(non_dominant_ref-non_dominant_state).norm();;
                 //value = 1.0/(reference_state-state).norm();
@@ -291,8 +299,7 @@ namespace acsr{
             //open_map[1].clear();
             //close_map[0].clear();
             //close_map[1].clear();
-            optimize_set[0].clear();
-            optimize_set[1].clear();
+            optimize_set.clear();
         }
 
         /***
@@ -365,7 +372,7 @@ namespace acsr{
         /***
          * override connecting step
          */
-        void connectingStep() override{
+        /*void connectingStep() override{
             if(!_run_flag)return;
             if(!this->_is_optimized_connect)
                 return;
@@ -390,13 +397,13 @@ namespace acsr{
                     continue;
                 }
                 n=it->lock();
-                if(n == nullptr || n->getTreeNodeState()==TreeNodeState::not_in_tree || n->getTreeNodeState()==TreeNodeState::not_in_set) {
+                if(n == nullptr || n->getTreeNodeState()==TreeNodeState::not_in_tree) {
                     it = optimize_set[index].erase(it);
                     continue;
                 }
                 auto temp_cost = chooseOtherNearestForOptimization(n,temp_target);
                 if(temp_target==nullptr || temp_cost>this->getMaxCost()){
-                    n->setTreeNodeState(TreeNodeState::not_in_set);
+                    //n->setTreeNodeState(TreeNodeState::not_in_set);
                     it = this->optimize_set[index].erase(it);
                     continue;
                 }
@@ -438,8 +445,8 @@ namespace acsr{
             if(explore_node == nullptr || target == nullptr)
                 return;
 
-            //optimize_set[index].remove(explore_node);
-            explore_node->setTreeNodeState(TreeNodeState::not_in_set);
+            optimize_set[index].remove(explore_node);
+            //explore_node->setTreeNodeState(TreeNodeState::not_in_set);
 
             if(!optimized){
                 return;
@@ -475,7 +482,7 @@ namespace acsr{
                 branchBound(this->_goal);
                 notifySolutionUpdate();
             }
-        }
+        }*/
 
 
     private:

@@ -35,8 +35,9 @@ namespace acsr {
                 ref_time.read("data/reference_speed_cc60.txt");
                 for (auto i = 0; i < ref_time.getNumPoints(); ++i) {
                     ref_time.setVector(i,ref_time.getVector(i)*1e-6);
+                    ref_time.setTime(i,ref_time.getTime(i)*1.5);
                 }
-                ref_time.print(std::cout);
+                //ref_time.print(std::cout);
             }
 
             _n_wires = nanowire_config->getNanowireCount();

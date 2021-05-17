@@ -136,7 +136,8 @@ namespace acsr {
                                       const std::vector <Eigen::VectorXd> &connect_control,
                                       const std::vector<double> &forward_durations,
                                       const std::vector<double> &reverse_durations,
-                                      const std::vector<double> &connect_durations) override{
+                                      const std::vector<double> &connect_durations,
+                                      const std::string& solution_string) override{
 
             ///copy the electrodes system image
             Document image(solution_image);

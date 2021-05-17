@@ -122,7 +122,8 @@ namespace acsr {
                                       const std::vector<Eigen::VectorXd> &connect_control,
                                       const std::vector<double> &forward_durations,
                                       const std::vector<double> &reverse_durations,
-                                      const std::vector<double> &connect_durations) {
+                                      const std::vector<double> &connect_durations,
+                                      const std::string& solution_string) {
             std::stringstream ss;
             double duration = std::accumulate(forward_durations.begin(), forward_durations.end(), 0.0);
             duration = std::accumulate(reverse_durations.begin(), reverse_durations.end(), duration);
@@ -275,7 +276,7 @@ namespace acsr {
             }
             ss << R"( </table> )";
             last_solution_table = ss.str();
-
+            /*
             ///response solution table;
             {
                 std::stringstream ss;
@@ -301,7 +302,11 @@ namespace acsr {
                     ss << reverse_durations[index] << '\n';
                 }
                 response_solution_table = ss.str();
-            }
+            }*/
+            response_solution_table = solution_string;
+            std::ofstream out("trajectory.txt");
+            out<<solution_string;
+            out.close();
 
             //setData(parameter_table + solution_update_table + last_solution_table);
         }

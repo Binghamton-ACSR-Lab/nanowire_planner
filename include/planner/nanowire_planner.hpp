@@ -204,6 +204,8 @@ namespace acsr {
             _is_optimized_connect = optimized_connect;
         }
 
+        virtual Eigen::VectorXd forward(const Eigen::VectorXd& state,const Eigen::VectorXd& controls,const double duration) = 0;
+
 
 
         /***
@@ -282,7 +284,8 @@ namespace acsr {
                                 std::vector<Eigen::VectorXd> &connect_control,
                                 std::vector<double> &forward_durations,
                                 std::vector<double> &reverse_durations,
-                                std::vector<double> &connect_durations) {
+                                std::vector<double> &connect_durations,
+                                std::string& solution_string) {
             forward_states.clear();
             reverse_states.clear();
             connect_states.clear();
@@ -321,10 +324,159 @@ namespace acsr {
                 connect_control = _planner_connection->_controls;
                 connect_durations = _planner_connection->_durations;
             }
-
             std::reverse(forward_states.begin(), forward_states.end());
             std::reverse(forward_control.begin(), forward_control.end());
             std::reverse(forward_durations.begin(), forward_durations.end());
+
+            auto maxDistance = [this](const Eigen::VectorXd& s1,const Eigen::VectorXd& s2){
+                double t1 = 0.0;
+                for(auto i=0;i<_dynamic_system->getRobotCount();++i){
+                    t1 = std::max( (s1.segment(2*i,2)-s2.segment(2*i,2)).norm(),t1);
+                }
+                return t1;
+            };
+
+            VariablesGrid forward_grid;
+            auto current_state = forward_states.front();
+            forward_grid.addVector(current_state*1e6,0.0);
+
+            double t = 0.0;
+            for(auto i=0;i<forward_states.size()-1;++i){
+                auto temp_state = forward_states[i];
+                //std::cout<<"Start State:"<<current_state.transpose()<<'\n';
+                auto temp_control=forward_control[i+1];
+                int steps = forward_durations[i+1]/Config::integration_step;
+                for(auto j=0;j<steps;++j){
+                    temp_state = forward(temp_state,temp_control,Config::integration_step);
+                    t+=Config::integration_step;
+                    if(maxDistance(temp_state,current_state)>25e-6){
+                        current_state = temp_state;
+                        forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
+                        t = 0.0;
+                    }
+                    /*
+                    if(std::abs(t-2.0)<Config::integration_step) {
+                        //std::cout<<j<<":"<<current_state.transpose()<<'\n';
+                        forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
+                        t = 0.0;
+                    }*/
+                }
+            }
+
+            if(!connect_states.empty()) {
+                for (auto i = 0; i < connect_states.size() - 1; ++i) {
+                    auto temp_state = connect_states[i];
+                    auto temp_control = connect_control[i + 1];
+                    int steps = connect_durations[i+1] / Config::integration_step;
+                    for (auto j = 0; j < steps; ++j) {
+                        temp_state = forward(temp_state, temp_control, Config::integration_step);
+                        t+=Config::integration_step;
+                        if(maxDistance(temp_state,current_state)>25e-6){
+                            current_state = temp_state;
+                            forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
+                            t = 0.0;
+                        }
+
+                        /*
+                        if(std::abs(t-2.0)<Config::integration_step) {
+                            forward_grid.addVector(current_state*1e6,
+                                                   forward_grid.getLastTime() + t);
+                            t=0.0;
+                        }*/
+                    }
+                }
+            }
+
+            VariablesGrid reverse_grid;
+            reverse_grid.addVector(reverse_states.back(),0.0);
+            for(int i=reverse_states.size()-1;i>0;--i){
+                auto current_state = reverse_states[i];
+                auto current_control=reverse_control[i];
+                int steps = reverse_durations[i]/Config::integration_step;
+                for(auto j=0;j<steps;++j){
+                    current_state = forward(current_state,current_control,Config::integration_step);
+                    reverse_grid.addVector(current_state,reverse_grid.getLastTime()+Config::integration_step);
+                }
+            }
+            for(int i=reverse_grid.getNumPoints()-1;i>=0;--i){
+                t+=Config::integration_step;
+                if(maxDistance(reverse_grid.getVector(i),current_state)>25e-6){
+                    current_state = reverse_grid.getVector(i);
+                    forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
+                    t = 0.0;
+                }
+                /*
+                if(std::abs(t-2.0)<Config::integration_step) {
+                    forward_grid.addVector(reverse_grid.getVector(i)*1e6, forward_grid.getLastTime()+t);
+                    t=0.0;
+                }*/
+            }
+
+            if(t>Config::integration_step){
+                forward_grid.addVector(reverse_grid.getVector(0)*1e6, forward_grid.getLastTime()+t);
+            }
+
+            std::stringstream ss;
+            forward_grid.print(ss,"","","",10,6,"\t","\n");
+            solution_string=ss.str();
+
+            /*
+            VariablesGrid g;
+            g.addVector(forward_states.front(),0.0);
+            double time_interval = 2.0;
+            auto forward_t = 0.0;
+
+            auto current_state = forward_states[0];
+            for(auto i=1;i<forward_states.size();++i){
+                auto t = forward_durations[i];
+                current_state = forward_states[i];
+                while(t>time_interval-forward_t){
+                    auto state = forward(current_state,forward_control[i],(time_interval-forward_t));
+                    t-=time_interval;
+                    g.addVector(state,g.getLastTime()+time_interval);
+                    current_state = state;
+                    forward_t = 0;
+                }
+                forward_t =forward_t + time_interval - t;
+            }
+            if(!connect_states.empty()) {
+                for (auto i = 0; i < connect_states.size(); ++i) {
+                    auto t = connect_durations[i];
+                    current_state = connect_states[i];
+                    while (t > time_interval - forward_t) {
+                        auto state = forward(current_state, connect_control[i], (time_interval - forward_t));
+                        t -= time_interval;
+                        g.addVector(state, g.getLastTime() + time_interval);
+                        current_state = state;
+                        forward_t = 0;
+                    }
+                    forward_t = forward_t + time_interval - t;
+                }
+            }
+
+            auto total_duration = _best_goal.first->getCost() + _best_goal.second->getCost() + std::accumulate(connect_durations.begin(),connect_durations.end(),0.0);
+
+            auto reverse_t = 0.0;
+            auto reverse_current_state = reverse_states.back();
+            g.addVector(reverse_states.back(),total_duration);
+
+            for(auto i=reverse_states.size()-1;i>=0;--i){
+                auto t = reverse_durations[i];
+                reverse_current_state = reverse_states[i];
+                while(t>time_interval-reverse_t){
+                    auto state = forward(reverse_current_state,reverse_control[i],(time_interval-reverse_t));
+                    t-=time_interval;
+                    g.addVector(state,g.getLastTime()-time_interval);
+                    reverse_current_state = state;
+                    reverse_t = 0;
+                }
+                reverse_t =reverse_t + time_interval - t;
+            }
+
+            g.addVector(reverse_current_state,_planner_connection->getTotalCost()+_best_goal.first->getCost()+reverse_t);
+            g.print();
+            std::cout<<"g is here\n";*/
+
         }
 
 
@@ -384,15 +536,19 @@ namespace acsr {
             std::vector<double> forward_durations;
             std::vector<double> reverse_durations;
             std::vector<double> connect_durations;
+            std::string solution_string;
             getSolutionVectors(forward_state,reverse_state,connect_state,
                                forward_control,reverse_control,connect_control,
-                               forward_durations,reverse_durations,connect_durations);
+                               forward_durations,reverse_durations,connect_durations,solution_string);
 
             if(!_run_flag)return;
             for(auto observer: solution_update_observers){
-                observer->onSolutionUpdate(forward_state,reverse_state,connect_state,forward_control,reverse_control,connect_control,forward_durations,reverse_durations,connect_durations);
+                observer->onSolutionUpdate(forward_state,reverse_state,connect_state,forward_control,reverse_control,connect_control,forward_durations,reverse_durations,connect_durations,solution_string);
             }
         }
+
+
+
     };
 }
 

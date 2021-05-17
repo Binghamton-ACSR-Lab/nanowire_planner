@@ -168,7 +168,8 @@ namespace acsr {
                               const std::vector<Eigen::VectorXd> &connect_control,
                               const std::vector<double> &forward_durations,
                               const std::vector<double> &reverse_durations,
-                              const std::vector<double> &connect_durations) override {
+                              const std::vector<double> &connect_durations,
+                              const std::string& solution_string) override {
             auto d = std::accumulate(forward_durations.begin(),forward_durations.end(),0.0);
             d = std::accumulate(reverse_durations.begin(),reverse_durations.end(),d);
             d = std::accumulate(connect_durations.begin(),connect_durations.end(),d);

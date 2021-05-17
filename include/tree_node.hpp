@@ -28,10 +28,10 @@ namespace acsr {
  */
     enum TreeNodeState {
         not_in_tree = 0,
-        not_in_set,
-        in_open_set,
-        in_close_set,
-        in_optimize_set
+        in_tree
+        //in_open_set,
+        //in_close_set,
+        //in_optimize_set
     };
 
     using TreeEdge =std::pair<Eigen::VectorXd,double>;

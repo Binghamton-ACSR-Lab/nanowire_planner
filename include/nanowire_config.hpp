@@ -153,6 +153,7 @@ namespace acsr {
         }
 
         std::vector<Eigen::Vector2i> getNearElectrodes(const Eigen::Vector2d& pt){
+            std::cout<<column_space;
             int f0 = std::floor(pt(0)/column_space);
             int c0 = std::ceil(pt(0)/column_space);
             int f1 = std::floor(pt(1)/column_space);
@@ -166,7 +167,7 @@ namespace acsr {
             });
             v.erase( unique( v.begin(), v.end() ), v.end() );
             v.erase(std::remove_if(v.begin(),v.end(),[&](const Eigen::Vector2i& position){
-                return  (electrodePositionToPosition(position)-pt).norm()>column_space/2*std::sqrt(2.0)+10e-6;
+                return  (electrodePositionToPosition(position)-pt).norm()>column_space*std::sqrt(2.0)/2;
             }),v.end());
             return v;
         }
@@ -207,8 +208,17 @@ namespace acsr {
 
              if (varmap.count("type")) {
                  type = varmap["type"].as<std::string>();
-                 row_space = std::stod(type.substr(2))*1e-6;
-                 column_space = std::stod(type.substr(2))*1e-6;
+                 //row_space = std::stod(type.substr(2))*1e-6;
+                 //column_space = std::stod(type.substr(2))*1e-6;
+                 if(type=="cc60"){
+                     row_space = column_space = 60e-6;
+                     data_file_name = "E_Map_4by4_100V_CC60_E.txt";
+                 }else if(type=="cc600"){
+                     row_space = column_space = 600e-6;
+                     data_file_name = "E_Map_4by4Mask1_100V_CC600reE.txt";
+                 }else{
+                     std::cout<<"no such config type\n";
+                 }
              } else {
                  std::cout << "Nanowire Config File Error\n";
              }
@@ -250,11 +260,12 @@ namespace acsr {
                 std::cout << "Nanowire Config File Error\n";
             }
 
+            /*
             if (varmap.count("data_file_name")) {
                 data_file_name = varmap["data_file_name"].as<std::string>();
             } else {
                 std::cout << "Nanowire Config File Error\n";
-            }
+            }*/
 
             zeta_potential_vec.resize(2 * nanowire_count);
             if (varmap.count("zeta_potential")) {
@@ -331,7 +342,7 @@ namespace acsr {
      * @return
      */
         double interp2(int page, double *x_axis, double *y_axis, int column_count, int row_count, double x, double y) {
-            int row;
+            /*int row;
             int col = 0;
             for (row = 0; row < row_count - 1; row++) {
                 if (y_axis[row] >= y) {
@@ -342,7 +353,12 @@ namespace acsr {
                     }
                     break;
                 }
-            }
+            }*/
+
+            int col = std::ceil((nanowire_config->getFieldDataCols()-1)/((nanowire_config->getElectrodesCols()-1)*nanowire_config->getColumnSpace())*x);
+            int row = std::ceil((nanowire_config->getFieldDataRows()-1)/((nanowire_config->getElectrodesRows()-1)*nanowire_config->getRowSpace())*y);
+
+            //assert(std::ceil(x_col)==col && std::ceil(y_row)==row);
 
             if (row == 0 && col == 0) {
                 return value[page][0][0];
@@ -486,6 +502,7 @@ namespace acsr {
         static Eigen::VectorXd goal_state;
         static double goal_radius;
         static bool bidirection;
+        static bool intermedia_control;
         static bool optimization;
         static double optimization_distance;
         //static bool intermediate_visualization;
@@ -508,6 +525,7 @@ namespace acsr {
         //static double refA;
         //static double refB;
         static double quality_decrease_factor;
+        static double quality_factor;
         static int dominant_path_count;
 
         //Parameters for image output.
@@ -550,6 +568,7 @@ namespace acsr {
                     ("start_state", po::value<std::string >(), "The given start state. Input is in the format of \"0 0\"")
                     ("goal_state", po::value<std::string >(), "The given goal state. Input is in the format of \"0 0\"")
                     ("goal_radius",po::value<double>(&Config::goal_radius),"The radius for the goal region.")
+                    ("intermedia_control",po::value<bool>(&Config::intermedia_control)->default_value(false),"inverse process.")
                     ("bidrection",po::value<bool>(&Config::bidirection)->default_value(false),"inverse process.")
                     ("optimization",po::value<bool>(&Config::optimization)->default_value(false),"optimization process.")
                     ("optimization_distance",po::value<double>(&Config::optimization_distance)->default_value(0.0),"optimization begins if distance within this value")
@@ -560,7 +579,8 @@ namespace acsr {
                     ("blossom_m",po::value<unsigned>(&Config::blossomM),"isst blossom parameter.")
                     ("blossom_n",po::value<unsigned>(&Config::blossomN),"ref-isst blossom parameter.")
                     ("dominant_path_count",po::value<int>(&Config::dominant_path_count),"ref-isst quality index count.")
-                    ("quality_decrease_factor",po::value<double>(&Config::quality_decrease_factor),"isst quality parameter.")
+                    ("quality_factor",po::value<double>(&Config::quality_factor)->default_value(50.0),"isst quality parameter.")
+                    ("quality_decrease_factor",po::value<double>(&Config::quality_decrease_factor)->default_value(1.1),"isst quality parameter.")
                     ("show_node",po::value<bool>(&Config::show_node),"show node on image.")
                     ;
 
@@ -647,13 +667,14 @@ namespace acsr {
     //DynamicSystemType Config::dynamic_system = DynamicSystemType::PointType;
     Eigen::VectorXd Config::init_state;
     Eigen::VectorXd Config::goal_state;
-    double Config::goal_radius =10;
+    double Config::goal_radius =5;
     bool Config::bidirection = false;
+    bool Config::intermedia_control = false;
     bool Config::optimization = true;
     //bool Config::intermediate_visualization = true;
     int Config::image_width=500;
     int Config::image_height=500;
-    double Config::optimization_distance=0;
+    double Config::optimization_distance=50;
 
     //double Config::rrt_delta_near;
     //double Config::rrt_delta_explore;
@@ -664,6 +685,7 @@ namespace acsr {
     //double Config::refA = 1.0005;
     //double Config::refB = 1.05;
     int Config::dominant_path_count = 2;
+    double Config::quality_factor = 50.0;
     double Config::quality_decrease_factor = 1.1;
 
     double Config::total_time = 600;

@@ -15,20 +15,21 @@ namespace acsr{
         //const unsigned int M = 15;
 
         ///a map to classify node, {node_ptr, estimated solution cost}
-        NodeMapType open_map[2];
-        NodeMapType close_map[2];
+        //NodeMapType open_map[2];
+        //NodeMapType close_map[2];
 
         /***
          * setup
          */
         void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) override {
             SST::setup(nanowire_config);
-            double total_cost = this->_dynamic_system->getHeuristic(this->_init_state,this->_target_state);
+            //double total_cost = this->_dynamic_system->getHeuristic(this->_init_state,this->_target_state);
 
-            open_map[0].insert({this->_root,total_cost});
-            this->_root->setTreeNodeState(in_open_set);
-            open_map[1].insert({this->_goal,total_cost});
-            this->_goal->setTreeNodeState(in_open_set);
+
+            //open_map[0].insert({this->_root,total_cost});
+            //this->_root->setTreeNodeState(in_open_set);
+            //open_map[1].insert({this->_goal,total_cost});
+            //this->_goal->setTreeNodeState(in_open_set);
 
         }
 
@@ -39,12 +40,25 @@ namespace acsr{
          * @return
          */
         bool searchSelection(TreeId tree_id, TreeNodePtr& parent){
+            auto point = _dynamic_system->randomState();
+            auto near = getNearNodeByCount(point,tree_id,10);
+            auto it = std::min_element(near.begin(), near.end(),
+                                       [](const NodePtr &node1, const NodePtr &node2) {
+                                           return std::static_pointer_cast<TreeNode>(node1)->getCost() < std::static_pointer_cast<TreeNode>(node2)->getCost();
+                                       });
+            parent = std::static_pointer_cast<TreeNode>(*it);
+
+            ///this might happen if there's a branchUpdate process
+            if(nullptr == parent)
+                return false;
+            return true;
+            /*
             int index = tree_id==TreeId::forward?0:1;
 
             ///swap open_map and close_map if no node exits in open_map
             if(open_map[index].empty()){
                 std::swap(open_map[index],close_map[index]);
-                for(auto pairs:open_map[index]){
+                for(const auto& pairs:open_map[index]){
                     pairs.first->setTreeNodeState(TreeNodeState::in_open_set);
                 }
             }
@@ -53,7 +67,7 @@ namespace acsr{
 
             auto min_cost_node_it = std::min_element(open_map[index].begin(),open_map[index].end(),
                                                      [](const std::pair<TreeNodePtr,double>& m1, const std::pair<TreeNodePtr,double>& m2){
-                                                         return m1.second < m2.second;
+                                                         return m1.second  < m2.second;
                                                      });
 
             ///select the node and remove from openmap
@@ -64,7 +78,7 @@ namespace acsr{
             if(nullptr == parent)
                 return false;
 
-            return true;
+            return true;*/
         }
 
         /***
@@ -91,8 +105,8 @@ namespace acsr{
                 auto steps = randomInteger(Config::min_time_steps,Config::max_time_steps);
                 if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,Config::integration_step,
                                                                    steps,temp_state,temp_duration)){
-                    return_value = true;
                     if(this->_dynamic_system->getHeuristic(temp_state,this->_goal->getState())<heuristic_value){
+                        return_value = true;
                         state=temp_state;
                         control=temp_control;
                         duration=temp_duration;
@@ -127,8 +141,9 @@ namespace acsr{
                 auto steps = randomInteger(Config::min_time_steps,Config::max_time_steps);
                 if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,Config::integration_step,
                                                                    steps,temp_state,temp_duration)){
-                    return_value = true;
+
                     if(this->_dynamic_system->getHeuristic(temp_state,this->_root->getState())<heuristic_value){
+                        return_value = true;
                         state=temp_state;
                         control=temp_control;
                         duration=temp_duration;
@@ -145,26 +160,27 @@ namespace acsr{
          * remove witness from searching container
          * @param node
          */
+         /*
         void removeNodeFromSet(TreeNodePtr node)  {
             if(node == nullptr){
                 //this->optimize_set[0].erase(std::remove(begin(this->optimize_set[0]), end(this->optimize_set[0]), node), end(this->optimize_set[0]));
                 //this->optimize_set[1].erase(std::remove(begin(this->optimize_set[1]), end(this->optimize_set[1]), node), end(this->optimize_set[1]));
 
-                open_map[0].erase(node);
-                open_map[1].erase(node);
-                close_map[0].erase(node);
-                close_map[1].erase(node);
+                //open_map[0].erase(node);
+                //open_map[1].erase(node);
+                //close_map[0].erase(node);
+                //close_map[1].erase(node);
                 return;
             }
 
             int tree_id = node->getTreeId()==TreeId::forward?0:1;
             if(node->getTreeNodeState() == TreeNodeState::in_open_set){
-                open_map[tree_id].erase(node);
+                //open_map[tree_id].erase(node);
             }else if(node->getTreeNodeState() == TreeNodeState::in_close_set){
-                close_map[tree_id].erase(node);
+                //close_map[tree_id].erase(node);
             }
             node->setTreeNodeState(TreeNodeState::not_in_set);
-        }
+        }*/
 
     public:
         explicit iSST(std::shared_ptr<NanowireSystem> dynamic_system):SST(dynamic_system){
@@ -179,12 +195,11 @@ namespace acsr{
             //this->reverse_prox_container.clear();
             this->forward_tree.clear();
             this->reverse_tree.clear();
-            open_map[0].clear();
-            open_map[1].clear();
-            close_map[0].clear();
-            close_map[1].clear();
-            this->optimize_set[0].clear();
-            this->optimize_set[1].clear();
+            //open_map[0].clear();
+            //open_map[1].clear();
+            //close_map[0].clear();
+            //close_map[1].clear();
+            this->optimize_set.clear();
         }
 
         /***
@@ -209,10 +224,10 @@ namespace acsr{
                 if(sst_parent== nullptr)return;
 
                 ///add parent to close map
-                if(sst_parent->getTreeNodeState()==TreeNodeState::in_open_set ||
-                   (sst_parent->getTreeNodeState()==TreeNodeState::not_in_set && sst_parent->isActive())){
-                    removeNodeFromSet(sst_parent);
-                    auto nodes_vec = this->getNearNodeByCount(sst_parent->getState(),TreeId::reverse,5);
+                //if(sst_parent->getTreeNodeState()==TreeNodeState::in_open_set ||
+                   //(sst_parent->getTreeNodeState()==TreeNodeState::not_in_set && sst_parent->isActive())){
+                    //removeNodeFromSet(sst_parent);
+                    //auto nodes_vec = this->getNearNodeByCount(sst_parent->getState(),TreeId::reverse,5);
                     //std::vector<SSTNodePtr> sstnode_vec(nodes_vec.size());
                     /*
                     std::transform(nodes_vec.begin(), nodes_vec.end(), sstnode_vec.begin(),
@@ -220,25 +235,32 @@ namespace acsr{
                                        return std::static_pointer_cast<SSTNode<T,Te,Tc>>(node);
                                    });*/
 
-                    auto pair_node = *std::min_element(nodes_vec.begin(),nodes_vec.end(),
-                                                       [&](const NodePtr& n1, const NodePtr& n2){
-                                                           return std::static_pointer_cast<TreeNode>(n1)->getCost() + this->_dynamic_system->getHeuristic(n1->getState(),sst_parent->getState())
-                                                                  < std::static_pointer_cast<TreeNode>(n2)->getCost() + this->_dynamic_system->getHeuristic(n2->getState(),sst_parent->getState());
-                                                       });
+//                    auto pair_node = *std::min_element(nodes_vec.begin(),nodes_vec.end(),
+//                                                       [&](const NodePtr& n1, const NodePtr& n2){
+//                                                           return std::static_pointer_cast<TreeNode>(n1)->getCost() + this->_dynamic_system->getHeuristic(n1->getState(),sst_parent->getState())
+//                                                                  < std::static_pointer_cast<TreeNode>(n2)->getCost() + this->_dynamic_system->getHeuristic(n2->getState(),sst_parent->getState());
+//                                                       });
 
-                    close_map[0].insert({sst_parent,
-                                         sst_parent->getCost() + std::static_pointer_cast<TreeNode>(pair_node)->getCost()+this->_dynamic_system->getHeuristic(sst_parent->getState(),pair_node->getState())});
+                    //close_map[0].insert({sst_parent,
+                     //                    sst_parent->getCost() + std::static_pointer_cast<TreeNode>(pair_node)->getCost()+this->_dynamic_system->getHeuristic(sst_parent->getState(),pair_node->getState())});
 
-                    sst_parent->setTreeNodeState(TreeNodeState::in_close_set);
+                    //sst_parent->setTreeNodeState(TreeNodeState::in_close_set);
 
-                }
-                if(state.size()!=this->_dynamic_system->getStateDimension())
-                    break;
+                //}
+                //if(state.size()!=this->_dynamic_system->getStateDimension())
+                //    break;
                 ///trying add the new node to tree
+                //if(sst_parent->getCost()+duration+ _dynamic_system->getHeuristic(state,_goal->getState())>getMaxCost())break;
+
                 auto new_node = this->addToTree(TreeId::forward,sst_parent,state,control,duration);
                 /// check is connectivity to another tree
                 this->checkConnection(new_node);
-
+                if(Config::show_node && new_node!= nullptr){
+                    std::thread t([this,state](){
+                        notifyNodeAdded(state,TreeId::forward);
+                    });
+                    t.detach();
+                }
                 ///new node not exist or new node is the best_goal
                 if(new_node == nullptr || this->_best_goal.first == new_node){
                     break;
@@ -247,26 +269,26 @@ namespace acsr{
                 }
             }
 
-            ///add parent to close map
-            if(sst_parent->getTreeNodeState()==TreeNodeState::not_in_set && sst_parent->isActive()){
-
-                auto nodes_vec = this->getNearNodeByCount(sst_parent->getState(),TreeId::reverse,5);
-                /*std::vector<SSTNodePtr> sstnode_vec(nodes_vec.size());
-
-                std::transform(nodes_vec.begin(), nodes_vec.end(), sstnode_vec.begin(),
-                               [](const std::shared_ptr<Node<StateType>> &node) {
-                                   return std::static_pointer_cast<SSTNode<StateType,ControlType>>(node);
-                               });*/
-
-                auto pair_node = *std::min_element(nodes_vec.begin(),nodes_vec.end(),
-                                                   [&](const NodePtr & n1, const NodePtr & n2){
-                                                       return std::static_pointer_cast<TreeNode>(n1)->getCost() + this->_dynamic_system->getHeuristic(n1->getState(),sst_parent->getState())
-                                                              < std::static_pointer_cast<TreeNode>(n2)->getCost() + this->_dynamic_system->getHeuristic(n2->getState(),sst_parent->getState());
-                                                   });
-                close_map[0].insert({sst_parent,
-                                     sst_parent->getCost() + std::static_pointer_cast<TreeNode>(pair_node)->getCost()+this->_dynamic_system->getHeuristic(sst_parent->getState(),pair_node->getState())});
-                sst_parent->setTreeNodeState(TreeNodeState::in_close_set);
-            }
+//            ///add parent to close map
+//            if(sst_parent->getTreeNodeState()==TreeNodeState::not_in_set && sst_parent->isActive()){
+//
+//                auto nodes_vec = this->getNearNodeByCount(sst_parent->getState(),TreeId::reverse,5);
+//                /*std::vector<SSTNodePtr> sstnode_vec(nodes_vec.size());
+//
+//                std::transform(nodes_vec.begin(), nodes_vec.end(), sstnode_vec.begin(),
+//                               [](const std::shared_ptr<Node<StateType>> &node) {
+//                                   return std::static_pointer_cast<SSTNode<StateType,ControlType>>(node);
+//                               });*/
+//
+//                auto pair_node = *std::min_element(nodes_vec.begin(),nodes_vec.end(),
+//                                                   [&](const NodePtr & n1, const NodePtr & n2){
+//                                                       return std::static_pointer_cast<TreeNode>(n1)->getCost() + this->_dynamic_system->getHeuristic(n1->getState(),sst_parent->getState())
+//                                                              < std::static_pointer_cast<TreeNode>(n2)->getCost() + this->_dynamic_system->getHeuristic(n2->getState(),sst_parent->getState());
+//                                                   });
+//                //close_map[0].insert({sst_parent,
+//                //                     sst_parent->getCost() + std::static_pointer_cast<TreeNode>(pair_node)->getCost()+this->_dynamic_system->getHeuristic(sst_parent->getState(),pair_node->getState())});
+//                //sst_parent->setTreeNodeState(TreeNodeState::in_close_set);
+//            }
 
 
         }
@@ -287,57 +309,63 @@ namespace acsr{
             auto sst_parent = std::dynamic_pointer_cast<SSTTreeNode>(parent);
             while (reverseBlossom(sst_parent,state,control,duration)){
                 ///add parent to close map
-                if(sst_parent->getTreeNodeState()==TreeNodeState::in_open_set ||
-                   (sst_parent->getTreeNodeState()==TreeNodeState::not_in_set && sst_parent->isActive())){
-                    removeNodeFromSet(sst_parent);
-                    auto nodes_vec = this->getNearNodeByCount(sst_parent->getState(),TreeId::forward,5);
-                    /*std::vector<std::shared_ptr<SSTNode<StateType,ControlType>>> sstnode_vec(nodes_vec.size());
-                    std::transform(nodes_vec.begin(), nodes_vec.end(), sstnode_vec.begin(),
-                                   [](const std::shared_ptr<Node<StateType>> &node) {
-                                       return std::static_pointer_cast<SSTNode<StateType,ControlType>>(node);
-                                   });*/
-                    auto pair_node = *std::min_element(nodes_vec.begin(),nodes_vec.end(),
-                                                       [&](const NodePtr & n1, const NodePtr & n2){
-                                                           return std::static_pointer_cast<TreeNode>(n1)->getCost() + this->_dynamic_system->getHeuristic(n1->getState(),sst_parent->getState())
-                                                                  < std::static_pointer_cast<TreeNode>(n2)->getCost() + this->_dynamic_system->getHeuristic(n2->getState(),sst_parent->getState());
-                                                       });
-
-                    close_map[1].insert({sst_parent,
-                                         sst_parent->getCost() + std::static_pointer_cast<TreeNode>(pair_node)->getCost()+this->_dynamic_system->getHeuristic(sst_parent->getState(),pair_node->getState())});
-
-                    sst_parent->setTreeNodeState(TreeNodeState::in_close_set);
-
-                }
-                if(state.size()!=this->_dynamic_system->getStateDimension())
-                    break;
+//                if(sst_parent->getTreeNodeState()==TreeNodeState::in_open_set ||
+//                   (sst_parent->getTreeNodeState()==TreeNodeState::not_in_set && sst_parent->isActive())){
+//                    removeNodeFromSet(sst_parent);
+//                    auto nodes_vec = this->getNearNodeByCount(sst_parent->getState(),TreeId::forward,5);
+//                    /*std::vector<std::shared_ptr<SSTNode<StateType,ControlType>>> sstnode_vec(nodes_vec.size());
+//                    std::transform(nodes_vec.begin(), nodes_vec.end(), sstnode_vec.begin(),
+//                                   [](const std::shared_ptr<Node<StateType>> &node) {
+//                                       return std::static_pointer_cast<SSTNode<StateType,ControlType>>(node);
+//                                   });*/
+//                    auto pair_node = *std::min_element(nodes_vec.begin(),nodes_vec.end(),
+//                                                       [&](const NodePtr & n1, const NodePtr & n2){
+//                                                           return std::static_pointer_cast<TreeNode>(n1)->getCost() + this->_dynamic_system->getHeuristic(n1->getState(),sst_parent->getState())
+//                                                                  < std::static_pointer_cast<TreeNode>(n2)->getCost() + this->_dynamic_system->getHeuristic(n2->getState(),sst_parent->getState());
+//                                                       });
+//
+//                    //close_map[1].insert({sst_parent,
+//                    //                     sst_parent->getCost() + std::static_pointer_cast<TreeNode>(pair_node)->getCost()+this->_dynamic_system->getHeuristic(sst_parent->getState(),pair_node->getState())});
+//
+//                    sst_parent->setTreeNodeState(TreeNodeState::in_close_set);
+//
+//                }
+//                if(state.size()!=this->_dynamic_system->getStateDimension())
+//                    break;
                 auto new_node = this->addToTree(TreeId::reverse,sst_parent,state,control,duration);
                 this->checkConnection(new_node);
+                if(Config::show_node && new_node!= nullptr){
+                    std::thread t([this,state](){
+                        notifyNodeAdded(state,TreeId::reverse);
+                    });
+                    t.detach();
+                }
                 if(new_node == nullptr || this->_best_goal.second == new_node){
                     break;
                 }else
                     sst_parent=new_node;
             }
 
-            if(sst_parent->getTreeNodeState()==TreeNodeState::not_in_set && sst_parent->isActive()){
-                auto nodes_vec = this->getNearNodeByCount(sst_parent->getState(),TreeId::forward,5);
-                /*std::vector<std::shared_ptr<SSTNode<StateType,ControlType>>> sstnode_vec(nodes_vec.size());
-                std::transform(nodes_vec.begin(), nodes_vec.end(), sstnode_vec.begin(),
-                               [](const std::shared_ptr<Node<StateType>> &node) {
-                                   return std::static_pointer_cast<SSTNode<StateType,ControlType>>(node);
-                               });*/
-
-                auto pair_node = *std::min_element(nodes_vec.begin(),nodes_vec.end(),
-                                                   [&](const NodePtr & n1, const NodePtr & n2){
-                                                       return std::static_pointer_cast<TreeNode>(n1)->getCost() + this->_dynamic_system->getHeuristic(n1->getState(),sst_parent->getState())
-                                                              < std::static_pointer_cast<TreeNode>(n2)->getCost() + this->_dynamic_system->getHeuristic(n2->getState(),sst_parent->getState());
-                                                   });
-
-                close_map[1].insert({sst_parent,
-                                     sst_parent->getCost() + std::static_pointer_cast<TreeNode>(pair_node)->getCost()+this->_dynamic_system->getHeuristic(sst_parent->getState(),pair_node->getState())});
-
-                sst_parent->setTreeNodeState(TreeNodeState::in_close_set);
-
-            }
+//            if(sst_parent->getTreeNodeState()==TreeNodeState::not_in_set && sst_parent->isActive()){
+//                auto nodes_vec = this->getNearNodeByCount(sst_parent->getState(),TreeId::forward,5);
+//                /*std::vector<std::shared_ptr<SSTNode<StateType,ControlType>>> sstnode_vec(nodes_vec.size());
+//                std::transform(nodes_vec.begin(), nodes_vec.end(), sstnode_vec.begin(),
+//                               [](const std::shared_ptr<Node<StateType>> &node) {
+//                                   return std::static_pointer_cast<SSTNode<StateType,ControlType>>(node);
+//                               });*/
+//
+//                auto pair_node = *std::min_element(nodes_vec.begin(),nodes_vec.end(),
+//                                                   [&](const NodePtr & n1, const NodePtr & n2){
+//                                                       return std::static_pointer_cast<TreeNode>(n1)->getCost() + this->_dynamic_system->getHeuristic(n1->getState(),sst_parent->getState())
+//                                                              < std::static_pointer_cast<TreeNode>(n2)->getCost() + this->_dynamic_system->getHeuristic(n2->getState(),sst_parent->getState());
+//                                                   });
+//
+//                //close_map[1].insert({sst_parent,
+//                //                     sst_parent->getCost() + std::static_pointer_cast<TreeNode>(pair_node)->getCost()+this->_dynamic_system->getHeuristic(sst_parent->getState(),pair_node->getState())});
+//
+//                sst_parent->setTreeNodeState(TreeNodeState::in_close_set);
+//
+//            }
 
         }
 

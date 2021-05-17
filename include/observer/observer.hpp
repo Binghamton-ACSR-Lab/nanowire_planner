@@ -40,7 +40,7 @@ namespace acsr {
                 const std::vector<Eigen::VectorXd> &connect_control,
                 const std::vector<double> &forward_durations,
                 const std::vector<double> &reverse_durations,
-                const std::vector<double> &connect_durations) = 0;
+                const std::vector<double> &connect_durations,const std::string& solution_string) = 0;
 
         virtual ~SolutionUpdateObserver() =default;
     };
