@@ -10,6 +10,7 @@
 #include <acado/acado_toolkit.hpp>
 #include <acado/acado_optimal_control.hpp>
 #include "nanowire_config.hpp"
+#include "planner_config.hpp"
 #include "tree_node.hpp"
 #include "nanowire_utility.hpp"
 #include "svg.hpp"
@@ -117,7 +118,7 @@ namespace acsr {
         ~NanowireSystem() = default;
 
         IVector getGrid(DVector state){
-            state/=Config::sst_delta_drain;
+            state/=PlannerConfig::sst_delta_drain;
             return state.cast<int>();
         }
 
@@ -223,7 +224,7 @@ namespace acsr {
      */
         Eigen::VectorXd randomControl() {
             Eigen::VectorXd control(_control_dimension);
-            if(Config::intermedia_control) {
+            if(PlannerConfig::intermedia_control) {
                 for (auto i = 0; i < _control_dimension; ++i)
                     control(i) = randomDouble(_control_low_bound(i),_control_upper_bound(i));
                 double p = 1.0 / control.maxCoeff();
@@ -490,7 +491,7 @@ namespace acsr {
             Eigen::VectorXd x_position(nanowire_count), y_position(nanowire_count);
             int iterator = 0;
 
-            while ((x0 - xt).norm() > Config::goal_radius && _run_flag) {
+            while ((x0 - xt).norm() > PlannerConfig::goal_radius && _run_flag) {
                 if (iterator++ >= 5)
                     return false;
 
@@ -527,7 +528,7 @@ namespace acsr {
                 ///define algorithm as solve
                 ACADO::OptimizationAlgorithm algorithm(ocp);
                 algorithm.set(ACADO::MAX_NUM_ITERATIONS, 15);
-                algorithm.set(ACADO::KKT_TOLERANCE, Config::goal_radius);
+                algorithm.set(ACADO::KKT_TOLERANCE, PlannerConfig::goal_radius);
                 auto ret = algorithm.solve();
 
                 ACADO::VariablesGrid vg_states, vg_controls;
@@ -586,7 +587,7 @@ namespace acsr {
 
                     auto compare_vector = vg_states.getVector(index + 1);
 
-                    if ((curr_state - compare_vector).norm() > Config::goal_radius && index > 0)
+                    if ((curr_state - compare_vector).norm() > PlannerConfig::goal_radius && index > 0)
                         break;
 
                     states->addVector(curr_state, current_time + time_point);

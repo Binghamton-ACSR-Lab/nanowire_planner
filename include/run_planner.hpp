@@ -34,7 +34,7 @@ namespace acsr {
             //read config files
             nanowire_config = std::make_shared<NanowireConfig>();
             nanowire_config->readFile("config/nanowire.cfg");
-            Config::readFile("config/planner.cfg");
+            PlannerConfig::readFile("config/planner.cfg");
             nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
 
             auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
@@ -56,12 +56,12 @@ namespace acsr {
 
 
             http_observer->reset();
-            planner = PlannerBuilder::create(Config::planner,nanowire_system);
+            planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
 
 ///necessary setting
-            planner->setStartState(Config::init_state);
-            planner->setTargetState(Config::goal_state);
-            planner->setGoalRadius(Config::goal_radius);
+            planner->setStartState(PlannerConfig::init_state);
+            planner->setTargetState(PlannerConfig::goal_state);
+            planner->setGoalRadius(PlannerConfig::goal_radius);
             //planner->setRandomSeed(time(NULL));
 
             svg_observer->setNanowireConfig(nanowire_config);
@@ -76,7 +76,7 @@ namespace acsr {
 
 
             planner->setup(nanowire_config);
-            std::cout<<"Goal Radius: "<<Config::goal_radius<<std::endl;
+            std::cout<<"Goal Radius: "<<PlannerConfig::goal_radius<<std::endl;
 
             std::thread forward_thread,reverse_thread,connecting_thread;
 
@@ -88,7 +88,7 @@ namespace acsr {
 
             ///reverse step thread
 
-            if(Config::bidirection){
+            if(PlannerConfig::bidirection){
                 reverse_run_flag = true;
                 //reverse_stopped_flag = false;
                 planner->setBiTreePlanner(true);
@@ -99,7 +99,7 @@ namespace acsr {
             }
 
             ///connecting thread
-            if(Config::optimization){
+            if(PlannerConfig::optimization){
                 optimize_run_flag = true;
                 //optimize_stopped_flag = false;
                 planner->setOptimizedConnect(true);
@@ -112,7 +112,7 @@ namespace acsr {
             VariablesGrid vg;
             vg.read("reference_path.txt");
             //is_running = true;
-            planner->notifyPlannerStart(getPlannerString(Config::planner),"img",vg);
+            planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner),"img",vg);
             while(!exit_flag){
 
                 std::cout<<"planner is running\n Number of Node: ";
@@ -123,7 +123,7 @@ namespace acsr {
                 auto stop = std::chrono::steady_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop-start);
                 std::cout<<"duration: " << duration.count()<<"\n";
-                if(duration.count()>Config::total_time){
+                if(duration.count()>PlannerConfig::total_time){
                     exit_flag = true;
                     planner->stop();
                     break;
@@ -143,7 +143,7 @@ namespace acsr {
                 if(reverse_thread.joinable())
                     reverse_thread.join();
             }
-            if(Config::optimization){
+            if(PlannerConfig::optimization){
                 if(connecting_thread.joinable())
                     connecting_thread.join();
             }
@@ -476,11 +476,11 @@ namespace acsr {
             nanowire_config->setZeta(zeta);
             //Config::readFile("config/planner.cfg");
             nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
-            planner = PlannerBuilder::create(Config::planner,nanowire_system);
+            planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
 
             planner->setStartState(Eigen::Map<Eigen::VectorXd>(_init_states.data(),2*_n_wires));
             planner->setTargetState(Eigen::Map<Eigen::VectorXd>(_target_states.data(),2*_n_wires));
-            planner->setGoalRadius(Config::goal_radius);
+            planner->setGoalRadius(PlannerConfig::goal_radius);
 
             svg_observer->setNanowireConfig(nanowire_config);
             planner->registerSolutionUpdateObserver(svg_observer);
@@ -500,14 +500,14 @@ namespace acsr {
             forward_run_flag = true;
             forward_thread = std::thread(&RunPlanner::forwardExplore,this);
             forward_thread.detach();
-            if(Config::bidirection){
+            if(PlannerConfig::bidirection){
                 reverse_run_flag = true;
                 planner->setBiTreePlanner(true);
                 reverse_thread = std::thread(&RunPlanner::reverseExplore,this);
                 reverse_thread.detach();
             }
 
-            if(Config::optimization){
+            if(PlannerConfig::optimization){
                 optimize_run_flag = true;
                 planner->setOptimizedConnect(true);
                 connecting_thread = std::thread(&RunPlanner::connecting,this);
@@ -535,7 +535,7 @@ namespace acsr {
             VariablesGrid vg;
             vg.read("reference_path.txt");
             run_flag = true;
-            planner->notifyPlannerStart(getPlannerString(Config::planner),"img",vg);
+            planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner),"img",vg);
 
         }
 

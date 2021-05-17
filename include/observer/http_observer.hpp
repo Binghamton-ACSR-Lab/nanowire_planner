@@ -399,7 +399,7 @@ namespace acsr {
                     auto it1 = solution_svg.find_first_of("<svg");
                     solution_svg.erase(solution_svg.begin(),solution_svg.begin()+it1-1);
 
-                    body = body + parameter_table + solution_update_table + last_solution_table + (Config::show_node?svg_element:"") +solution_svg  +  R"(</body></html>)";
+                    body = body + parameter_table + solution_update_table + last_solution_table + (PlannerConfig::show_node?svg_element:"") +solution_svg  +  R"(</body></html>)";
                     response.setBody(body);
                     std::string result = response.getResult();
                     session->send(result.c_str(), result.size(), [session]() {

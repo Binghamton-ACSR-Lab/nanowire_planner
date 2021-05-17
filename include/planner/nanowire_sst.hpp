@@ -129,7 +129,7 @@ namespace acsr{
             if(node == nullptr)return;
             TreeId another_treeid = (node->getTreeId()==TreeId::forward?TreeId::reverse:TreeId::forward);
             ///check solution update
-            auto nearest_vec_node = getNearNodeByRadiusAndNearest(node->getState(),another_treeid,Config::optimization_distance);
+            auto nearest_vec_node = getNearNodeByRadiusAndNearest(node->getState(),another_treeid,PlannerConfig::optimization_distance);
 
             ///there're nodes within optimization_distance
             if(!nearest_vec_node.first.empty()){
@@ -182,7 +182,7 @@ namespace acsr{
     public:
         Eigen::VectorXd
         forward(const Eigen::VectorXd &state, const Eigen::VectorXd &controls, const double duration) override {
-            auto step_length = Config::integration_step;
+            auto step_length = PlannerConfig::integration_step;
             Eigen::VectorXd result;
             double d;
             this->_dynamic_system->forwardPropagateBySteps(state,controls,step_length,duration/step_length,result,d);
@@ -320,7 +320,7 @@ namespace acsr{
             double min_value=-1.0;
             if(node== nullptr )return -1;
             TreeId other_tree_id = node->getTreeId()==TreeId::reverse?TreeId::forward:TreeId::reverse;
-            auto nearest = getNearNodeByRadiusAndNearest(node->getState(),other_tree_id,Config::optimization_distance);
+            auto nearest = getNearNodeByRadiusAndNearest(node->getState(),other_tree_id,PlannerConfig::optimization_distance);
             if(nearest.first.empty()){
                 pair_node = nullptr;
                 return min_value;
@@ -537,7 +537,7 @@ namespace acsr{
         void forwardStep() override{
             auto temp_state = this->_dynamic_system->randomState();
             auto temp_control = this->_dynamic_system->randomControl();
-            auto nearest_vec_node = getNearNodeByRadiusAndNearest(temp_state,TreeId::forward,Config::sst_delta_near);
+            auto nearest_vec_node = getNearNodeByRadiusAndNearest(temp_state,TreeId::forward,PlannerConfig::sst_delta_near);
             auto parent = std::static_pointer_cast<SSTTreeNode>(nearest_vec_node.second);
             if(!nearest_vec_node.first.empty()) {
                 std::vector<SSTTreeNodePtr> nearest_vec(nearest_vec_node.first.size());
@@ -555,10 +555,10 @@ namespace acsr{
                                            });
             }
 
-            auto steps = randomInteger(Config::min_time_steps,Config::max_time_steps);
+            auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
             Eigen::VectorXd result;
             double duration;
-            if(forwardPropagate(parent->getState(),temp_control,Config::integration_step,steps,result,duration)){
+            if(forwardPropagate(parent->getState(),temp_control,PlannerConfig::integration_step,steps,result,duration)){
                 auto new_node = addToTree(TreeId::forward,parent,result,temp_control,duration);
                 checkConnection(new_node);
             }
@@ -572,7 +572,7 @@ namespace acsr{
                 return;
             auto temp_state = this->_dynamic_system->randomState();
             auto temp_control = this->_dynamic_system->randomControl();
-            auto nearest_vec_node = getNearNodeByRadiusAndNearest(temp_state,TreeId::reverse,Config::sst_delta_near);
+            auto nearest_vec_node = getNearNodeByRadiusAndNearest(temp_state,TreeId::reverse,PlannerConfig::sst_delta_near);
             //auto parent = std::static_pointer_cast<SSTTreeNode>(nearest_vec_node.second);
             auto parent = nearest_vec_node.second;
             if(!nearest_vec_node.first.empty()) {
@@ -593,10 +593,10 @@ namespace acsr{
 
             }
 
-            auto steps = randomInteger(Config::min_time_steps,Config::max_time_steps);
+            auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
             Eigen::VectorXd result;
             double duration;
-            if(reversePropagate(parent->getState(),temp_control,Config::integration_step,steps,result,duration)){
+            if(reversePropagate(parent->getState(),temp_control,PlannerConfig::integration_step,steps,result,duration)){
                 auto new_node = addToTree(TreeId::reverse,std::static_pointer_cast<TreeNode>(parent),result,temp_control,duration);
                 checkConnection(new_node);
             }
@@ -670,7 +670,7 @@ namespace acsr{
             Eigen::VectorXd target_state = target->getState();
 
             bool optimized = this->_dynamic_system->connect(init_state, target_state,
-                                                            Config::integration_step,
+                                                            PlannerConfig::integration_step,
                                                             vec_state, vec_control,vec_duration);
             if(!_run_flag)return;
             if(explore_node == nullptr || target == nullptr)

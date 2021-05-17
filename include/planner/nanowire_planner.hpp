@@ -345,10 +345,10 @@ namespace acsr {
                 auto temp_state = forward_states[i];
                 //std::cout<<"Start State:"<<current_state.transpose()<<'\n';
                 auto temp_control=forward_control[i+1];
-                int steps = forward_durations[i+1]/Config::integration_step;
+                int steps = forward_durations[i+1]/PlannerConfig::integration_step;
                 for(auto j=0;j<steps;++j){
-                    temp_state = forward(temp_state,temp_control,Config::integration_step);
-                    t+=Config::integration_step;
+                    temp_state = forward(temp_state,temp_control,PlannerConfig::integration_step);
+                    t+=PlannerConfig::integration_step;
                     if(maxDistance(temp_state,current_state)>25e-6){
                         current_state = temp_state;
                         forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
@@ -367,10 +367,10 @@ namespace acsr {
                 for (auto i = 0; i < connect_states.size() - 1; ++i) {
                     auto temp_state = connect_states[i];
                     auto temp_control = connect_control[i + 1];
-                    int steps = connect_durations[i+1] / Config::integration_step;
+                    int steps = connect_durations[i+1] / PlannerConfig::integration_step;
                     for (auto j = 0; j < steps; ++j) {
-                        temp_state = forward(temp_state, temp_control, Config::integration_step);
-                        t+=Config::integration_step;
+                        temp_state = forward(temp_state, temp_control, PlannerConfig::integration_step);
+                        t+=PlannerConfig::integration_step;
                         if(maxDistance(temp_state,current_state)>25e-6){
                             current_state = temp_state;
                             forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
@@ -392,14 +392,14 @@ namespace acsr {
             for(int i=reverse_states.size()-1;i>0;--i){
                 auto current_state = reverse_states[i];
                 auto current_control=reverse_control[i];
-                int steps = reverse_durations[i]/Config::integration_step;
+                int steps = reverse_durations[i]/PlannerConfig::integration_step;
                 for(auto j=0;j<steps;++j){
-                    current_state = forward(current_state,current_control,Config::integration_step);
-                    reverse_grid.addVector(current_state,reverse_grid.getLastTime()+Config::integration_step);
+                    current_state = forward(current_state,current_control,PlannerConfig::integration_step);
+                    reverse_grid.addVector(current_state,reverse_grid.getLastTime()+PlannerConfig::integration_step);
                 }
             }
             for(int i=reverse_grid.getNumPoints()-1;i>=0;--i){
-                t+=Config::integration_step;
+                t+=PlannerConfig::integration_step;
                 if(maxDistance(reverse_grid.getVector(i),current_state)>25e-6){
                     current_state = reverse_grid.getVector(i);
                     forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
@@ -412,7 +412,7 @@ namespace acsr {
                 }*/
             }
 
-            if(t>Config::integration_step){
+            if(t>PlannerConfig::integration_step){
                 forward_grid.addVector(reverse_grid.getVector(0)*1e6, forward_grid.getLastTime()+t);
             }
 
@@ -510,9 +510,25 @@ namespace acsr {
 
        virtual void notifyPlannerStart(const std::string& planner_name,const std::string& image_name,const VariablesGrid& reference) {
            for(auto observer: planner_start_observers){
-               observer->onPlannerStart(planner_name,_dynamic_system->getRobotCount(),_init_state,_target_state,reference,Config::bidirection,Config::optimization,
-                                        Config::total_time,Config::goal_radius,Config::integration_step,Config::min_time_steps,Config::max_time_steps,
-                                        Config::sst_delta_near,Config::sst_delta_drain,Config::optimization_distance,Config::blossomM,Config::blossomN,Config::dominant_path_count,Config::quality_decrease_factor,image_name);
+               observer->onPlannerStart(planner_name,
+                                        _dynamic_system->getRobotCount(),
+                                        _init_state,_target_state,
+                                        reference,
+                                        PlannerConfig::bidirection,
+                                        PlannerConfig::optimization,
+                                        PlannerConfig::total_time,
+                                        PlannerConfig::goal_radius,
+                                        PlannerConfig::integration_step,
+                                        PlannerConfig::min_time_steps,
+                                        PlannerConfig::max_time_steps,
+                                        PlannerConfig::sst_delta_near,
+                                        PlannerConfig::sst_delta_drain,
+                                        PlannerConfig::optimization_distance,
+                                        PlannerConfig::blossomM,
+                                        PlannerConfig::blossomN,
+                                        PlannerConfig::dominant_path_count,
+                                        PlannerConfig::quality_decrease_factor,
+                                        image_name);
            }
        }
 

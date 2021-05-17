@@ -20,39 +20,23 @@ namespace acsr{
     class RefSST: public SST{
 
     protected:
-        ///propagation times in one blossom
-        //const unsigned int M = 15;
-
-        ///a map to classify node, {node_ptr, estimated solution cost}
-        //NodeMapType open_map[2];
-        //NodeMapType close_map[2];
-
         /***
          * setup
          */
         void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) override {
             SST::setup(nanowire_config);
-            //double total_cost = this->_dynamic_system->getHeuristic(this->_init_state,this->_target_state);
-
-            //open_map[0].insert({this->_root,total_cost});
-            //this->_root->setTreeNodeState(in_open_set);
-            //open_map[1].insert({this->_goal,total_cost});
-            //this->_goal->setTreeNodeState(in_open_set);
+            ///generating global reference path & storing it to "reference_path.txt"
             GlobalPath global_path;
-            //auto nanowire_config = std::make_shared<NanowireConfig>();
-            //nanowire_config->readFile("config/nanowire.cfg");
             global_path.init(_init_state,_target_state,nanowire_config);
             global_path.getStartTargetElectordes();
             VariablesGrid states;
             global_path.generateBestReferenceTrajectory(states);
 
+            ///read reference path
             reference_path = std::make_shared<ReferencePath>();
             reference_path->readFile("reference_path.txt");
 
-            //std::cout<<reference_path->getStates()<<std::endl;
-
-            //_dynamic_system->setReferencePath(reference_path);
-
+            ///check dominant path
             std::vector<double> length(_dynamic_system->getRobotCount(),0.0);
             for(auto j=0;j<states.getNumPoints()-1;++j){
                 for(auto i=0;i<_dynamic_system->getRobotCount();++i){
@@ -63,13 +47,11 @@ namespace acsr{
             }
             std::vector<std::pair<int,double>> length_with_index;
             for(auto i=0;i<length.size();++i)
-                length_with_index.push_back({i,length[i]});
+                length_with_index.emplace_back(i,length[i]);
             std::sort(length_with_index.begin(),length_with_index.end(),[](const auto& p1,const auto& p2){
                 return p1.second>p2.second;
             });
-            //_dominant_index = {length_with_index[0].first,length_with_index[1].first};
-            //_dominant_index = {length_with_index[0].first};
-            auto v = std::min(Config::dominant_path_count,_dynamic_system->getRobotCount());
+            auto v = std::min(PlannerConfig::dominant_path_count,_dynamic_system->getRobotCount());
             for(auto i=0;i<v;++i)
                 _dominant_index.push_back(length_with_index[i].first);
         }
@@ -81,9 +63,7 @@ namespace acsr{
          * @return
          */
         bool searchSelection(TreeId tree_id, TreeNodePtr& parent){
-
-            //auto& other_tree = tree_id==TreeId::forward?reverse_tree:forward_tree;
-            //auto other_tree_id = tree_id==TreeId::forward?TreeId::reverse:TreeId::forward;
+            
             std::uniform_real_distribution<double> distribution(0.0,1.0);
             auto p = distribution(_random_engine);
             parent = nullptr;
@@ -132,11 +112,11 @@ namespace acsr{
             //auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_goal->getState());
 
             ///propagate M times and select a best node with least estimated solution cost
-            for(int i=0;i<Config::blossomM;i++) {
+            for(int i=0;i<PlannerConfig::blossomM;i++) {
                 if(!_run_flag)return false;
                 auto temp_control = this->_dynamic_system->randomControl();
-                auto steps = randomInteger(Config::min_time_steps,Config::max_time_steps);
-                if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,Config::integration_step,
+                auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
+                if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,PlannerConfig::integration_step,
                                                                    steps,temp_state,temp_duration)){
                     return_value = true;
                     quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::forward)] =
@@ -145,7 +125,7 @@ namespace acsr{
             }
             if(return_value){
                 int i = 0;
-                for(auto it = quality_map.rbegin();i<Config::blossomN && it!=quality_map.rend();++it,++i){
+                for(auto it = quality_map.rbegin();i<PlannerConfig::blossomN && it!=quality_map.rend();++it,++i){
                     params.push_back(it->second);
                 }
             }
@@ -171,11 +151,11 @@ namespace acsr{
             double temp_duration;
             //auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_root->getState());
 
-            for(int i=0;i<Config::blossomM;i++) {
+            for(int i=0;i<PlannerConfig::blossomM;i++) {
                 if(!_run_flag)return false;
                 auto temp_control = this->_dynamic_system->randomControl();
-                auto steps = randomInteger(Config::min_time_steps,Config::max_time_steps);
-                if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,Config::integration_step,
+                auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
+                if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,PlannerConfig::integration_step,
                                                                    steps,temp_state,temp_duration)){
                     return_value = true;
                     quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::reverse)] =
@@ -184,7 +164,7 @@ namespace acsr{
             }
             if(return_value){
                 int i = 0;
-                for(auto it = quality_map.rbegin();i<Config::blossomN && it!=quality_map.rend();++it,++i){
+                for(auto it = quality_map.rbegin();i<PlannerConfig::blossomN && it!=quality_map.rend();++it,++i){
                     params.push_back(it->second);
                 }
             }
@@ -257,7 +237,7 @@ namespace acsr{
             if(time <= max_time){
                 //auto p = max_time/time;
                 //auto t = (1.0-p)*(1-p);
-                auto q = (time/max_time-1.0)*Config::quality_factor;
+                auto q = (time/max_time-1.0)*PlannerConfig::quality_factor;
                 //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
                 //value = std::pow(a,time-max_time)/(dominant_ref-dominant_state).norm() + 0.1*std::pow(a,time-max_time)/(non_dominant_ref-non_dominant_state).norm();
                 //value = 1.0/(reference_state-state).norm();
@@ -268,7 +248,7 @@ namespace acsr{
             }else {
                 //auto p = time/max_time;
                 //auto t = (p-1.0)*(p-1)*(p-1);
-                auto q = Config::quality_decrease_factor*(max_time/time-1.0)*Config::quality_factor;
+                auto q = PlannerConfig::quality_decrease_factor*(max_time/time-1.0)*PlannerConfig::quality_factor;
                 //value = 1.0/((dominant_ref-dominant_state).norm()*t) + 0.1/((non_dominant_ref-non_dominant_state).norm()*t);
                 //value = std::pow(b,max_time-time)/(dominant_ref-dominant_state).norm() +0.1*std::pow(b,max_time-time)/(non_dominant_ref-non_dominant_state).norm();;
                 //value = 1.0/(reference_state-state).norm();
@@ -317,7 +297,7 @@ namespace acsr{
                     return;
                 for(auto param:params){
                     auto new_node = addToTree(TreeId::forward,parent,param.state,param.control,param.duration);
-                    if(Config::show_node && new_node!= nullptr){
+                    if(PlannerConfig::show_node && new_node!= nullptr){
                         auto state = new_node->getState();
                         std::thread t([this,state](){
                             Eigen::VectorXd s(2*_dominant_index.size());
@@ -351,7 +331,7 @@ namespace acsr{
                     return;
                 for(auto& param:params){
                     auto new_node = addToTree(TreeId::reverse,parent,param.state,param.control,param.duration);
-                    if(Config::show_node && new_node!= nullptr){
+                    if(PlannerConfig::show_node && new_node!= nullptr){
                         auto state = new_node->getState();
                         std::thread t([this,state](){
                             Eigen::VectorXd s(2*_dominant_index.size());
@@ -369,126 +349,9 @@ namespace acsr{
             }
         }
 
-        /***
-         * override connecting step
-         */
-        /*void connectingStep() override{
-            if(!_run_flag)return;
-            if(!this->_is_optimized_connect)
-                return;
-
-            if(this->optimize_set[0].empty() && this->optimize_set[1].empty())
-                return;
-            TreeNodePtr explore_node = nullptr;
-            TreeNodePtr target = nullptr;
-            TreeNodePtr temp_target = nullptr;
-            //mutex_for_set.lock();
-            auto index = randomInteger(0,1);
-            if(this->optimize_set[index].empty())
-                index = 1-index;
-
-            double total_cost = std::numeric_limits<double>::max();
-            auto it = this->optimize_set[index].begin();
-            while(it!=this->optimize_set[index].end()){
-                if(!_run_flag)return;
-                TreeNodePtr n = nullptr;
-                if((*it).expired()){
-                    it = optimize_set[index].erase(it);
-                    continue;
-                }
-                n=it->lock();
-                if(n == nullptr || n->getTreeNodeState()==TreeNodeState::not_in_tree) {
-                    it = optimize_set[index].erase(it);
-                    continue;
-                }
-                auto temp_cost = chooseOtherNearestForOptimization(n,temp_target);
-                if(temp_target==nullptr || temp_cost>this->getMaxCost()){
-                    //n->setTreeNodeState(TreeNodeState::not_in_set);
-                    it = this->optimize_set[index].erase(it);
-                    continue;
-                }
-
-                if(temp_cost < total_cost){
-                    total_cost =temp_cost;
-                    explore_node = n;
-                    target=temp_target;
-                }
-                ++it;
-            }
-
-            if(explore_node ==nullptr || explore_node->getTreeNodeState()==TreeNodeState::not_in_tree || total_cost > this->getMaxCost())
-            {
-                return;
-            }
-
-            Eigen::MatrixXd vec_state;
-            Eigen::MatrixXd vec_control;
-            Eigen::VectorXd vec_duration;
-
-            Eigen::VectorXd init_state;
-            Eigen::VectorXd target_state;
-            if(explore_node == nullptr || target == nullptr)
-                return;
-
-            if(explore_node->getTreeId()==TreeId::forward){
-                init_state = explore_node->getState();
-                target_state = target->getState();
-            }else{
-                init_state = target->getState();
-                target_state = explore_node->getState();
-            }
-
-            bool optimized = this->_dynamic_system->connect(init_state, target_state,
-                                                            Config::integration_step,
-                                                            vec_state, vec_control,vec_duration);
-            if(!_run_flag)return;
-            if(explore_node == nullptr || target == nullptr)
-                return;
-
-            optimize_set[index].remove(explore_node);
-            //explore_node->setTreeNodeState(TreeNodeState::not_in_set);
-
-            if(!optimized){
-                return;
-            }
-            if(vec_duration.size()==0)
-                return;
-
-            //auto total_duration = std::accumulate(vec_duration.begin(),vec_duration.end(),0.0);
-            auto total_duration = vec_duration.sum();
-            if(explore_node->getCost() + target->getCost() + total_duration < this->getMaxCost()){
-                if(explore_node->getTreeId() == TreeId::forward) {
-                    this->_best_goal.first = explore_node;
-                    this->_best_goal.second = target;
-                }else{
-                    this->_best_goal.first = target;
-                    this->_best_goal.second = explore_node;
-                }
-
-                std::vector<Eigen::VectorXd> connect_states;
-                std::vector<Eigen::VectorXd> connect_controls;
-                std::vector<double> connect_durations;
-                for(auto i=0;i<vec_state.rows()-1;++i){
-                    connect_states.push_back(vec_state.row(i));
-                }
-                for(auto i=0;i<vec_control.rows();++i){
-                    connect_controls.push_back(vec_control.row(i));
-                }
-                for(auto i=0;i<vec_duration.size();++i){
-                    connect_durations.push_back(vec_duration(i));
-                }
-                _planner_connection = std::make_shared<PlannerConnection>(this->_best_goal,connect_states,connect_controls,connect_durations);
-                branchBound(this->_root);
-                branchBound(this->_goal);
-                notifySolutionUpdate();
-            }
-        }*/
-
-
-    private:
+    protected:
         std::shared_ptr<ReferencePath> reference_path;
         std::vector<int> _dominant_index;
-
     };
 }
 

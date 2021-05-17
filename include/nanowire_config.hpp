@@ -41,12 +41,12 @@ namespace acsr {
         /***
      * constructor
      */
-        NanowireConfig() =default;
+        NanowireConfig() = default;
 
         /***
      * destructor
      */
-        virtual ~NanowireConfig() =default;
+        virtual ~NanowireConfig() = default;
 
         NanowireConfig(const NanowireConfig &) = delete;
 
@@ -60,7 +60,7 @@ namespace acsr {
             return row_space;
         }
 
-        std::string getType() const{
+        std::string getType() const {
             return type;
         }
 
@@ -128,12 +128,12 @@ namespace acsr {
             return nanowire_index_for_image;
         }
 
-        void setNanowireCount(int n_wire){
+        void setNanowireCount(int n_wire) {
             nanowire_count = n_wire;
         }
 
-        void setZeta(const std::vector<double>& zeta){
-            assert(zeta.size() == 2*nanowire_count);
+        void setZeta(const std::vector<double> &zeta) {
+            assert(zeta.size() == 2 * nanowire_count);
             zeta_potential_vec = zeta;
         }
 
@@ -146,35 +146,39 @@ namespace acsr {
         }
 
 
-        Eigen::Vector2d electrodePositionToPosition(const Eigen::Vector2i& electrode_position){
-            if(electrode_position(0) >= electrodes_row || electrode_position(0) <0 ||
-               electrode_position(1) >= electrodes_column || electrode_position(1) < 0)return {-1.0,-1.0};
-            return {column_space*electrode_position(1),column_space*electrode_position(0)};
+        Eigen::Vector2d electrodePositionToPosition(const Eigen::Vector2i &electrode_position) {
+            if (electrode_position(0) >= electrodes_row || electrode_position(0) < 0 ||
+                electrode_position(1) >= electrodes_column || electrode_position(1) < 0)
+                return {-1.0, -1.0};
+            return {column_space * electrode_position(1), column_space * electrode_position(0)};
         }
 
-        std::vector<Eigen::Vector2i> getNearElectrodes(const Eigen::Vector2d& pt){
-            std::cout<<column_space;
-            int f0 = std::floor(pt(0)/column_space);
-            int c0 = std::ceil(pt(0)/column_space);
-            int f1 = std::floor(pt(1)/column_space);
-            int c1 = std::ceil(pt(1)/column_space);
-            std::vector<Eigen::Vector2i> v={
-                    {f1,f0},{c1,f0},{f1,c0},{c1,c0}
+        std::vector<Eigen::Vector2i> getNearElectrodes(const Eigen::Vector2d &pt) {
+            std::cout << column_space;
+            int f0 = std::floor(pt(0) / column_space);
+            int c0 = std::ceil(pt(0) / column_space);
+            int f1 = std::floor(pt(1) / column_space);
+            int c1 = std::ceil(pt(1) / column_space);
+            std::vector<Eigen::Vector2i> v = {
+                    {f1, f0},
+                    {c1, f0},
+                    {f1, c0},
+                    {c1, c0}
                     //{1,1},{1,1}
             };
-            std::sort(v.begin(),v.end(),[](const Eigen::Vector2i& p1,const Eigen::Vector2i& p2){
-                return p1(0)==p2(0)?p1(1)>p2(1):p1(0)>p2(0);
+            std::sort(v.begin(), v.end(), [](const Eigen::Vector2i &p1, const Eigen::Vector2i &p2) {
+                return p1(0) == p2(0) ? p1(1) > p2(1) : p1(0) > p2(0);
             });
-            v.erase( unique( v.begin(), v.end() ), v.end() );
-            v.erase(std::remove_if(v.begin(),v.end(),[&](const Eigen::Vector2i& position){
-                return  (electrodePositionToPosition(position)-pt).norm()>column_space*std::sqrt(2.0)/2;
-            }),v.end());
+            v.erase(unique(v.begin(), v.end()), v.end());
+            v.erase(std::remove_if(v.begin(), v.end(), [&](const Eigen::Vector2i &position) {
+                return (electrodePositionToPosition(position) - pt).norm() > column_space * std::sqrt(2.0) / 2;
+            }), v.end());
             return v;
         }
 
-     /***
-     * read config file, this function should be called after create an instance
-     */
+        /***
+        * read config file, this function should be called after create an instance
+        */
         void readFile(std::string file_name) {
             po::options_description opt_desc("Options");
             opt_desc.add_options()
@@ -184,11 +188,10 @@ namespace acsr {
                     //("row_space", po::value<double>()->default_value(600), "row space.")
                     //("column_space", po::value<double>()->default_value(600),"column space")
                     ("electrodes_row", po::value<int>()->default_value(4), "electordes row")
-                    ("electrodes_column", po::value<int>()->default_value(4),"electrodes column")
-                    ("field_data_rows", po::value<int>()->default_value(181),"")
-                    ("field_data_cols", po::value<int>()->default_value(181),"")
-                    ("data_file_name", po::value<std::string>(),"data file")
-                    ;
+                    ("electrodes_column", po::value<int>()->default_value(4), "electrodes column")
+                    ("field_data_rows", po::value<int>()->default_value(181), "")
+                    ("field_data_cols", po::value<int>()->default_value(181), "")
+                    ("data_file_name", po::value<std::string>(), "data file");
 
             po::variables_map varmap;
 
@@ -206,22 +209,22 @@ namespace acsr {
                 std::cout << "Nanowire Config File Error\n";
             }
 
-             if (varmap.count("type")) {
-                 type = varmap["type"].as<std::string>();
-                 //row_space = std::stod(type.substr(2))*1e-6;
-                 //column_space = std::stod(type.substr(2))*1e-6;
-                 if(type=="cc60"){
-                     row_space = column_space = 60e-6;
-                     data_file_name = "E_Map_4by4_100V_CC60_E.txt";
-                 }else if(type=="cc600"){
-                     row_space = column_space = 600e-6;
-                     data_file_name = "E_Map_4by4Mask1_100V_CC600reE.txt";
-                 }else{
-                     std::cout<<"no such config type\n";
-                 }
-             } else {
-                 std::cout << "Nanowire Config File Error\n";
-             }
+            if (varmap.count("type")) {
+                type = varmap["type"].as<std::string>();
+                //row_space = std::stod(type.substr(2))*1e-6;
+                //column_space = std::stod(type.substr(2))*1e-6;
+                if (type == "cc60") {
+                    row_space = column_space = 60e-6;
+                    data_file_name = "E_Map_4by4_100V_CC60_E.txt";
+                } else if (type == "cc600") {
+                    row_space = column_space = 600e-6;
+                    data_file_name = "E_Map_4by4Mask1_100V_CC600reE.txt";
+                } else {
+                    std::cout << "no such config type\n";
+                }
+            } else {
+                std::cout << "Nanowire Config File Error\n";
+            }
 
 /*
             if (varmap.count("row_space")) {
@@ -355,8 +358,10 @@ namespace acsr {
                 }
             }*/
 
-            int col = std::ceil((nanowire_config->getFieldDataCols()-1)/((nanowire_config->getElectrodesCols()-1)*nanowire_config->getColumnSpace())*x);
-            int row = std::ceil((nanowire_config->getFieldDataRows()-1)/((nanowire_config->getElectrodesRows()-1)*nanowire_config->getRowSpace())*y);
+            int col = std::ceil((nanowire_config->getFieldDataCols() - 1) /
+                                ((nanowire_config->getElectrodesCols() - 1) * nanowire_config->getColumnSpace()) * x);
+            int row = std::ceil((nanowire_config->getFieldDataRows() - 1) /
+                                ((nanowire_config->getElectrodesRows() - 1) * nanowire_config->getRowSpace()) * y);
 
             //assert(std::ceil(x_col)==col && std::ceil(y_row)==row);
 
@@ -477,222 +482,8 @@ namespace acsr {
                 mat_E.row(i) = Eigen::VectorXd::Map(&ex[i][0], pages);
         }
     };
-
-
-    class Config
-    {
-    private:
-
-    public:
-        Config()=default;
-        virtual ~Config()=default;
-
-        static double integration_step;
-        //static std::string stopping_type;
-        //static double stopping_check;
-        //static std::string stats_type;
-        //static double stats_check;
-        static double total_time;
-
-        static int random_seed;
-
-        static PlannerType planner;
-        //static DynamicSystemType dynamic_system;
-        static Eigen::VectorXd init_state;
-        static Eigen::VectorXd goal_state;
-        static double goal_radius;
-        static bool bidirection;
-        static bool intermedia_control;
-        static bool optimization;
-        static double optimization_distance;
-        //static bool intermediate_visualization;
-
-        //parameters for rrt star
-        //static double rrt_delta_near;
-        //static double rrt_delta_explore;
-
-        //parameters for SST
-        static double sst_delta_near;
-        static double sst_delta_drain;
-
-        //parameters for iSST
-        static unsigned min_time_steps;
-        static unsigned max_time_steps;
-        static unsigned blossomM;
-
-        //parameters for ref-iSST
-        static unsigned blossomN;
-        //static double refA;
-        //static double refB;
-        static double quality_decrease_factor;
-        static double quality_factor;
-        static int dominant_path_count;
-
-        //Parameters for image output.
-        //static double tree_line_width;
-        //static double solution_line_width;
-        static int image_width;
-        static int image_height;
-        static bool show_node;
-        //static double node_diameter;
-        //static double solution_node_diameter;
-
-
-
-        /***
-         * read configuration file
-         * @param file_name file name
-         */
-
-        static void readFile(std::string file_name){
-            po::options_description opt_desc("Options");
-            opt_desc.add_options()
-                    //("help","Print available options.") ("config", po::value< std::string >( &config_file_name )->default_value("../input/default.cfg"),
-                    //"The name of a file to read for options (default is ../input/default.cfg). Command-line options"
-                    //" override the ones in the config file. A config file may contain lines with syntax"
-                    //"\n'long_option_name = value'\nand comment lines that begin with '#'." )
-                    ("integration_step",po::value<double>(&Config::integration_step),"Integration step for propagations.")
-                    //("stopping_type",po::value<std::string>(&Config::stopping_type),"Condition for terminating planner (iterations or time).")
-                    //("stopping_check",po::value<double>(&Config::stopping_check),"Amount of time or iterations to execute.")
-                    //("stats_type",po::value<std::string>(&Config::stats_type),"Condition for printing statistics of a planner (iterations or time).")
-                    //("stats_check",po::value<double>(&Config::stats_check),"Frequency of statistics gathering.")
-                    //("intermediate_visualization",po::value<bool>(&Config::intermediate_visualization)->default_value(false),"Flag denoting generating images during statistics gathering.")
-                    ("min_time_steps",po::value<unsigned>(&Config::min_time_steps),"Minimum number of simulation steps per local planner propagation.")
-                    ("max_time_steps",po::value<unsigned>(&Config::max_time_steps),"Maximum number of simulation steps per local planner propagation.")
-                    ("total_time",po::value<double>(&Config::total_time),"total running time.")
-                    ("random_seed",po::value<int>(&Config::random_seed),"Random seed for the planner.")
-                    ("sst_delta_near",po::value<double>(&Config::sst_delta_near),"The radius for BestNear in SST.")
-                    ("sst_delta_drain",po::value<double>(&Config::sst_delta_drain),"The radius for witness nodes in SST.")
-                    ("planner",po::value<std::string>(),"A string for the planner to run.")
-                    //("system",po::value<std::string>(),"A string for the system to plan for.")
-                    ("start_state", po::value<std::string >(), "The given start state. Input is in the format of \"0 0\"")
-                    ("goal_state", po::value<std::string >(), "The given goal state. Input is in the format of \"0 0\"")
-                    ("goal_radius",po::value<double>(&Config::goal_radius),"The radius for the goal region.")
-                    ("intermedia_control",po::value<bool>(&Config::intermedia_control)->default_value(false),"inverse process.")
-                    ("bidrection",po::value<bool>(&Config::bidirection)->default_value(false),"inverse process.")
-                    ("optimization",po::value<bool>(&Config::optimization)->default_value(false),"optimization process.")
-                    ("optimization_distance",po::value<double>(&Config::optimization_distance)->default_value(0.0),"optimization begins if distance within this value")
-                    ("image_width",po::value<int>(&Config::image_width),"Width of output images.")
-                    ("image_height",po::value<int>(&Config::image_height),"Height of output images.")
-                    //("rrt_delta_near",po::value<double>(&Config::rrt_delta_near),"rrt star nearest range.")
-                    //("rrt_delta_explore",po::value<double>(&Config::rrt_delta_explore),"rrt star explore distance.")
-                    ("blossom_m",po::value<unsigned>(&Config::blossomM),"isst blossom parameter.")
-                    ("blossom_n",po::value<unsigned>(&Config::blossomN),"ref-isst blossom parameter.")
-                    ("dominant_path_count",po::value<int>(&Config::dominant_path_count),"ref-isst quality index count.")
-                    ("quality_factor",po::value<double>(&Config::quality_factor)->default_value(50.0),"isst quality parameter.")
-                    ("quality_decrease_factor",po::value<double>(&Config::quality_decrease_factor)->default_value(1.1),"isst quality parameter.")
-                    ("show_node",po::value<bool>(&Config::show_node),"show node on image.")
-                    ;
-
-            po::variables_map varmap;
-
-            std::ifstream ifs( file_name.c_str());
-            if( !ifs.is_open() )
-                std::cout << "no such file." << std::endl;
-            else
-            {
-                po::store( po::parse_config_file( ifs, opt_desc ), varmap );
-                po::notify( varmap );
-                std::cout << "read config file done.\n" << std::endl;
-            }
-
-            std::vector<double> state;
-            if (varmap.count("start_state"))
-            {
-                std::stringstream stream(varmap["start_state"].as<std::string>());
-                double n; while(stream >> n) {state.push_back(n*1e-6);}
-                // state = varmap["start_state"].as<std::vector<double> >();
-                Config::init_state = Eigen::VectorXd(state.size());
-                for(unsigned i=0;i<state.size();i++)
-                {
-                    Config::init_state[i] = state[i];
-                }
-            }
-            state.clear();
-            if (varmap.count("goal_state"))
-            {
-                std::stringstream stream(varmap["goal_state"].as<std::string>());
-                double n; while(stream >> n) {state.push_back(n*1e-6);}
-                Config::goal_state = Eigen::VectorXd(state.size());
-                for(unsigned i=0;i<state.size();i++)
-                {
-                    Config::goal_state[i] = state[i];
-                }
-            }
-
-            if (varmap.count("planner"))
-            {
-                auto planner_string = varmap["planner"].as<std::string>();
-                boost::to_upper(planner_string);
-                if(planner_string.find("REF")!=std::string::npos){
-                    Config::planner = PlannerType::e_Ref_iSST;
-                }else if(planner_string.find("ISST")!=std::string::npos){
-                    Config::planner = PlannerType::e_iSST;
-                }else if(planner_string.find("SST")!=std::string::npos){
-                    Config::planner = PlannerType::e_SST;
-                }
-            }
-            Config::sst_delta_drain*=1e-6;
-            Config::sst_delta_near*=1e-6;
-            Config::goal_radius*=1e-6;
-            Config::optimization_distance*=1e-6;
-/*
-            if (varmap.count("system"))
-            {
-                auto system_string = varmap["system"].as<std::string>();
-                boost::to_upper(system_string);
-                if(system_string.find("POINT")!=std::string::npos){
-                    Config::dynamic_system = DynamicSystemType::PointType;
-                }else if(system_string.find("NANOWIRE")!=std::string::npos){
-                    Config::dynamic_system = DynamicSystemType::NanowireType;
-                }else if(system_string.find("ELECTRODE")!=std::string::npos){
-                    Config::dynamic_system = DynamicSystemType::ElectrodeType;
-                }
-            }*/
-
-        }
-    };
-
-    double Config::integration_step;
-    //std::string Config::stopping_type;
-    // Config::stopping_check;
-    //std::string Config::stats_type;
-    //double Config::stats_check;
-    unsigned Config::min_time_steps;
-    unsigned Config::max_time_steps;
-    int Config::random_seed;
-    double Config::sst_delta_near;
-    double Config::sst_delta_drain;
-    PlannerType Config::planner = PlannerType::e_Ref_iSST;
-    //DynamicSystemType Config::dynamic_system = DynamicSystemType::PointType;
-    Eigen::VectorXd Config::init_state;
-    Eigen::VectorXd Config::goal_state;
-    double Config::goal_radius =5;
-    bool Config::bidirection = false;
-    bool Config::intermedia_control = false;
-    bool Config::optimization = true;
-    //bool Config::intermediate_visualization = true;
-    int Config::image_width=500;
-    int Config::image_height=500;
-    double Config::optimization_distance=50;
-
-    //double Config::rrt_delta_near;
-    //double Config::rrt_delta_explore;
-
-    unsigned Config::blossomM = 15;
-    unsigned Config::blossomN = 5;
-
-    //double Config::refA = 1.0005;
-    //double Config::refB = 1.05;
-    int Config::dominant_path_count = 2;
-    double Config::quality_factor = 50.0;
-    double Config::quality_decrease_factor = 1.1;
-
-    double Config::total_time = 600;
-    bool Config::show_node = true;
-
-
 }
+
 
 
 #endif //NANOWIREPLANNER_NANOWIRE_CONFIG_HPP
