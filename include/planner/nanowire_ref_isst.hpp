@@ -308,6 +308,4 @@ namespace acsr{
     };
 }
 
-
-
 #endif //NANOWIREPLANNER_NANOWIRE_REF_ISST_HPP

@@ -196,10 +196,6 @@ namespace acsr{
     double PlannerConfig::search_p = 0.5;
     double PlannerConfig::total_time = 600;
     bool PlannerConfig::show_node = true;
-
-
-
-
 }
 
 #endif //NANOWIREPLANNER_PLANNER_CONFIG_HPP
