@@ -112,11 +112,14 @@ namespace acsr {
 
         }
 
+
         NanowireSystem(const NanowireSystem &) = delete;
 
         NanowireSystem operator=(const NanowireSystem &) = delete;
 
         ~NanowireSystem() = default;
+
+
 
         IVector getGrid(DVector state){
             state/=PlannerConfig::sst_delta_drain;
@@ -125,6 +128,16 @@ namespace acsr {
 
         void setHeight(const Eigen::VectorXd& height){
             _current_height = height;
+        }
+
+        //void setHeight(const std::vector<double>& height){
+            //Eigen::Map<Eigen::VectorXd> zp(.data(), _nanowire_config->getNanowireCount());
+        //}
+
+
+
+        double getStepSize(){
+            return _step_length;
         }
 
         /***
@@ -408,7 +421,7 @@ namespace acsr {
      * override DynamicSystem function
      * @return
      */
-        bool connect(const Eigen::VectorXd &start, const Eigen::VectorXd &target, double int_step,
+        bool connect(const Eigen::VectorXd &start, const Eigen::VectorXd &target,
                      Eigen::MatrixXd &vec_state,
                      Eigen::MatrixXd &vec_control,
                      Eigen::VectorXd &vec_duration)  {
@@ -428,14 +441,9 @@ namespace acsr {
                                                  [](double &aa, double &bb) {
                                                      return (std::abs(aa) < std::abs(bb));
                                                  });
-            double int_step_max;
-            if(_nanowire_config->getType()=="cc60")
-                int_step_max = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * int_step;
-            else if(_nanowire_config->getType()=="cc600")
-                int_step_max = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * int_step;
 
 
-            if (!optimize(x0, xt, int_step_max, states, controls)) {
+            if (!optimize(x0, xt, _step_length, states, controls)) {
                 return false;
             }
 

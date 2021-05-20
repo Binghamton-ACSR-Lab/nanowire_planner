@@ -342,6 +342,8 @@ namespace acsr {
                     brynet::net::http::HttpResponse response;
                     auto cmd = httpParser.getBody();
                     boost::to_upper(cmd);
+
+                    ///if request body exist
                     if(!cmd.empty()){
                         if(cmd.find("SOLUTION")!=std::string::npos){
                             response.setBody(response_solution_table);
@@ -379,14 +381,15 @@ namespace acsr {
                         }
                     }
 
+                    ///no request body
                     std::string body = R"(
-                <!DOCTYPE html>
-                <html>
-                    <head>
-                        <title>Planner Data</title>
-                    </head>
-                    <body>
-                )";
+                        <!DOCTYPE html>
+                        <html>
+                            <head>
+                                <title>Planner Data</title>
+                            </head>
+                            <body>
+                        )";
                     std::ifstream ifs("img.svg");
                     svg_element=std::string( (std::istreambuf_iterator<char>(ifs) ),
                                          (std::istreambuf_iterator<char>()    ) );
@@ -419,7 +422,6 @@ namespace acsr {
                                                                      true,
                                                                      false);
                     httpSession->send(std::move(frame));
-
                 };
 
                 brynet::net::wrapper::HttpListenerBuilder listenBuilder;

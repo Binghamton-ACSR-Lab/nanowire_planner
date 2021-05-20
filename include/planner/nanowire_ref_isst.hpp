@@ -63,9 +63,7 @@ namespace acsr{
          * @return
          */
         bool searchSelection(TreeId tree_id, TreeNodePtr& parent){
-            
-            std::uniform_real_distribution<double> distribution(0.0,1.0);
-            auto p = distribution(_random_engine);
+            auto p = randomDouble(0.0,1.0);
             parent = nullptr;
             if(p<PlannerConfig::search_p){
                 auto point = getRandomReferencePoint();
@@ -113,7 +111,7 @@ namespace acsr{
             ///propagate M times and select a best node with least estimated solution cost
             for(int i=0;i<PlannerConfig::blossomM;i++) {
                 if(!_run_flag)return false;
-                auto temp_control = this->_dynamic_system->randomControl();
+                auto temp_control = _dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
                 if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,
                                                                    steps,temp_state,temp_duration)){

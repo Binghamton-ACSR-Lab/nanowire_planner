@@ -7,6 +7,7 @@
 #include <utility>
 #include <numeric>
 #include <random>
+#include <system_config.hpp>
 #include "nanowire_system.hpp"
 #include "nanowire_utility.hpp"
 #include "observer/observer.hpp"
@@ -345,11 +346,11 @@ namespace acsr {
                 auto temp_state = forward_states[i];
                 //std::cout<<"Start State:"<<current_state.transpose()<<'\n';
                 auto temp_control=forward_control[i+1];
-                int steps = forward_durations[i+1]/PlannerConfig::integration_step;
+                int steps = forward_durations[i+1]/_dynamic_system->getStepSize();
                 for(auto j=0;j<steps;++j){
-                    temp_state = forward(temp_state,temp_control,PlannerConfig::integration_step);
-                    t+=PlannerConfig::integration_step;
-                    if(maxDistance(temp_state,current_state)>25e-6){
+                    temp_state = forward(temp_state,temp_control,_dynamic_system->getStepSize());
+                    t+=_dynamic_system->getStepSize();
+                    if(maxDistance(temp_state,current_state)>SystemConfig::max_distance){
                         current_state = temp_state;
                         forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
                         t = 0.0;
@@ -367,11 +368,11 @@ namespace acsr {
                 for (auto i = 0; i < connect_states.size() - 1; ++i) {
                     auto temp_state = connect_states[i];
                     auto temp_control = connect_control[i + 1];
-                    int steps = connect_durations[i+1] / PlannerConfig::integration_step;
+                    int steps = connect_durations[i+1] / _dynamic_system->getStepSize();
                     for (auto j = 0; j < steps; ++j) {
-                        temp_state = forward(temp_state, temp_control, PlannerConfig::integration_step);
-                        t+=PlannerConfig::integration_step;
-                        if(maxDistance(temp_state,current_state)>25e-6){
+                        temp_state = forward(temp_state, temp_control, _dynamic_system->getStepSize());
+                        t+=_dynamic_system->getStepSize();
+                        if(maxDistance(temp_state,current_state)>SystemConfig::max_distance){
                             current_state = temp_state;
                             forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
                             t = 0.0;
@@ -392,14 +393,14 @@ namespace acsr {
             for(int i=reverse_states.size()-1;i>0;--i){
                 auto current_state = reverse_states[i];
                 auto current_control=reverse_control[i];
-                int steps = reverse_durations[i]/PlannerConfig::integration_step;
+                int steps = reverse_durations[i]/_dynamic_system->getStepSize();
                 for(auto j=0;j<steps;++j){
-                    current_state = forward(current_state,current_control,PlannerConfig::integration_step);
-                    reverse_grid.addVector(current_state,reverse_grid.getLastTime()+PlannerConfig::integration_step);
+                    current_state = forward(current_state,current_control,_dynamic_system->getStepSize());
+                    reverse_grid.addVector(current_state,reverse_grid.getLastTime()+_dynamic_system->getStepSize());
                 }
             }
             for(int i=reverse_grid.getNumPoints()-1;i>=0;--i){
-                t+=PlannerConfig::integration_step;
+                t+=_dynamic_system->getStepSize();
                 if(maxDistance(reverse_grid.getVector(i),current_state)>25e-6){
                     current_state = reverse_grid.getVector(i);
                     forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
@@ -412,7 +413,7 @@ namespace acsr {
                 }*/
             }
 
-            if(t>PlannerConfig::integration_step){
+            if(t>_dynamic_system->getStepSize()){
                 forward_grid.addVector(reverse_grid.getVector(0)*1e6, forward_grid.getLastTime()+t);
             }
 

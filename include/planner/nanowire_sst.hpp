@@ -182,16 +182,11 @@ namespace acsr{
     public:
         Eigen::VectorXd
         forward(const Eigen::VectorXd &state, const Eigen::VectorXd &controls, const double duration) override {
-            auto step_length = PlannerConfig::integration_step;
+            auto step_length = _dynamic_system->getStepSize();
             Eigen::VectorXd result;
             double d;
-            this->_dynamic_system->forwardPropagateBySteps(state,controls,duration/step_length,result,d);
+            _dynamic_system->forwardPropagateBySteps(state,controls,duration/step_length,result,d);
             return result;
-            /*if(this->_dynamic_system->forwardPropagateBySteps(state,controls,step_length,duration/step_length,result,d))
-                return result;
-            else{
-                throw std::invalid_argument("forward step error");
-            }*/
         }
 
     protected:
@@ -670,7 +665,6 @@ namespace acsr{
             Eigen::VectorXd target_state = target->getState();
 
             bool optimized = this->_dynamic_system->connect(init_state, target_state,
-                                                            PlannerConfig::integration_step,
                                                             vec_state, vec_control,vec_duration);
             if(!_run_flag)return;
             if(explore_node == nullptr || target == nullptr)
