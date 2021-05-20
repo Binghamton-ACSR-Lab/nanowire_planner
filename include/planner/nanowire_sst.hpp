@@ -35,8 +35,8 @@ namespace acsr{
          * @param duration
          * @return
          */
-        virtual bool forwardPropagate(const Eigen::VectorXd& init_state, const Eigen::VectorXd& control,double step_length, int steps,Eigen::VectorXd& result_state,double& duration){
-            return this->_dynamic_system->forwardPropagateBySteps(init_state,control,step_length,steps,result_state,duration);
+        virtual bool forwardPropagate(const Eigen::VectorXd& init_state, const Eigen::VectorXd& control, int steps,Eigen::VectorXd& result_state,double& duration){
+            return this->_dynamic_system->forwardPropagateBySteps(init_state,control,steps,result_state,duration);
         }
 
         /***
@@ -49,8 +49,8 @@ namespace acsr{
          * @param duration
          * @return
          */
-        virtual bool reversePropagate(const Eigen::VectorXd& init_state, const Eigen::VectorXd& control,double step_length, int steps,Eigen::VectorXd& result_state,double& duration){
-            return this->_dynamic_system->reversePropagateBySteps(init_state,control,step_length,steps,result_state,duration);
+        virtual bool reversePropagate(const Eigen::VectorXd& init_state, const Eigen::VectorXd& control, int steps,Eigen::VectorXd& result_state,double& duration){
+            return this->_dynamic_system->reversePropagateBySteps(init_state,control,steps,result_state,duration);
         }
 
         /***
@@ -185,7 +185,7 @@ namespace acsr{
             auto step_length = PlannerConfig::integration_step;
             Eigen::VectorXd result;
             double d;
-            this->_dynamic_system->forwardPropagateBySteps(state,controls,step_length,duration/step_length,result,d);
+            this->_dynamic_system->forwardPropagateBySteps(state,controls,duration/step_length,result,d);
             return result;
             /*if(this->_dynamic_system->forwardPropagateBySteps(state,controls,step_length,duration/step_length,result,d))
                 return result;
@@ -558,7 +558,7 @@ namespace acsr{
             auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
             Eigen::VectorXd result;
             double duration;
-            if(forwardPropagate(parent->getState(),temp_control,PlannerConfig::integration_step,steps,result,duration)){
+            if(forwardPropagate(parent->getState(),temp_control,steps,result,duration)){
                 auto new_node = addToTree(TreeId::forward,parent,result,temp_control,duration);
                 checkConnection(new_node);
             }
@@ -596,7 +596,7 @@ namespace acsr{
             auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
             Eigen::VectorXd result;
             double duration;
-            if(reversePropagate(parent->getState(),temp_control,PlannerConfig::integration_step,steps,result,duration)){
+            if(reversePropagate(parent->getState(),temp_control,steps,result,duration)){
                 auto new_node = addToTree(TreeId::reverse,std::static_pointer_cast<TreeNode>(parent),result,temp_control,duration);
                 checkConnection(new_node);
             }

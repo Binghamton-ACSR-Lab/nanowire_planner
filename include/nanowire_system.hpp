@@ -62,12 +62,16 @@ namespace acsr {
         Eigen::VectorXd _control_low_bound;
         Eigen::VectorXd _control_upper_bound;
 
+        Eigen::VectorXd _current_height;
+
         Eigen::MatrixXd _mat_theta;
 
         const double _e0 = 8.85e-12;
         const double _em = 2.17 * _e0;
         const double _mu = 216.95e-3;
         const double _wire_radius = 5e-6;
+
+        double _step_length = 0.1;
 
         //std::shared_ptr<ReferencePath> reference_path;
 
@@ -84,13 +88,9 @@ namespace acsr {
             auto nanowire_count = _nanowire_config->getNanowireCount();
             _state_dimension = 2 * nanowire_count;
 
-            //Eigen::VectorXd zp(2*nanowire_count);
+            ///set zeta
             auto zp_vec = nanowire_config->getZetaPotentialVec();
             Eigen::Map<Eigen::VectorXd> zp(zp_vec.data(), 2 * nanowire_count);
-            /*
-        for(auto i=0;i<2*nanowire_count;++i)
-            zp(i) = zp_vec[i];
-        */
             setZetaPotential(zp);
 
             _state_low_bound.resize(2 * nanowire_count);
@@ -109,6 +109,7 @@ namespace acsr {
             _control_low_bound.setZero();
             _control_upper_bound.resize(_control_dimension);
             _control_upper_bound.setOnes();
+
         }
 
         NanowireSystem(const NanowireSystem &) = delete;
@@ -120,6 +121,10 @@ namespace acsr {
         IVector getGrid(DVector state){
             state/=PlannerConfig::sst_delta_drain;
             return state.cast<int>();
+        }
+
+        void setHeight(const Eigen::VectorXd& height){
+            _current_height = height;
         }
 
         /***
@@ -155,6 +160,17 @@ namespace acsr {
         void setZetaPotential(const Eigen::VectorXd &zeta_potential) {
             assert(zeta_potential.size() == _state_dimension);
             _mat_theta = zeta_potential.asDiagonal();
+            auto nanowire_count = _nanowire_config->getNanowireCount();
+            auto max_theta_pt = std::max_element(_mat_theta.data(), _mat_theta.data() + 2 * nanowire_count,
+                                                 [](double &aa, double &bb) {
+                                                     return (std::abs(aa) < std::abs(bb));
+                                                 });
+
+            //double int_step_max;
+            if(_nanowire_config->getType()=="cc60")
+                _step_length = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * PlannerConfig::integration_step;
+            else if(_nanowire_config->getType()=="cc600")
+                _step_length = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * PlannerConfig::integration_step;
         }
 
         auto getConfig(){
@@ -242,41 +258,22 @@ namespace acsr {
      * @return
      */
         bool
-        forwardPropagateBySteps(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control, double step_length,
+        forwardPropagateBySteps(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control, //double step_length,
                                 int steps, Eigen::VectorXd &result_state, double &duration) {
             Eigen::MatrixXd mat_E;
             if (init_state.size() != _state_dimension)
                 return false;
             result_state = init_state;
             auto nanowire_count = _nanowire_config->getNanowireCount();
-            Eigen::VectorXd x(nanowire_count), y(nanowire_count);
-
-            auto max_theta_pt = std::max_element(_mat_theta.data(), _mat_theta.data() + 2 * nanowire_count,
-                                                 [](double &aa, double &bb) {
-                                                     return (std::abs(aa) < std::abs(bb));
-                                                 });
-
-            //double int_step_max;
-            if(_nanowire_config->getType()=="cc60")
-                step_length = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * step_length;
-            else if(_nanowire_config->getType()=="cc600")
-                step_length = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * step_length;
-
-            //double int_step = std::max(int(std::round(1.0 / std::abs(*max_theta_pt))), 1) * step_length;
 
             for (auto i = 0; i < steps; ++i) {
-                for (int k = 0; k < nanowire_count; k++) {
-                    x(k) = result_state(2 * k);
-                    y(k) = result_state(2 * k + 1);
-                }
-                _field->getField(x, y, mat_E, nanowire_count);
+                _field->getField(result_state,_current_height, mat_E, nanowire_count);
                 auto mat_velocity = _mat_theta * mat_E * control * _em / _mu;
-                result_state += step_length * mat_velocity;
-                //MAX_VELOCITY = MAX_VELOCITY > mat_velocity.norm()/wire_count ? MAX_VELOCITY : mat_velocity.norm()/wire_count;
+                result_state += _step_length * mat_velocity;
                 if (!validState(result_state))
                     return false;
             }
-            duration = steps * step_length;
+            duration = steps * _step_length;
             return true;
         }
 
@@ -286,9 +283,9 @@ namespace acsr {
      * @return
      */
         bool
-        reversePropagateBySteps(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control, double step_length,
+        reversePropagateBySteps(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control, //double step_length,
                                 int step, Eigen::VectorXd &result_state, double &duration){
-            return forwardPropagateBySteps(init_state, control, step_length, step, result_state, duration);
+            return forwardPropagateBySteps(init_state, control, step, result_state, duration);
         }
 
         /***
@@ -314,37 +311,24 @@ namespace acsr {
      * @return
      */
         bool forwardPropagateByDistance(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control,
-                                        double step_length, double max_distance, Eigen::VectorXd &result_state,
+                                        double max_distance, Eigen::VectorXd &result_state,
                                         double &duration) {
             Eigen::MatrixXd mat_E;
             auto nanowire_count = _nanowire_config->getNanowireCount();
             if (init_state.size() != nanowire_count)
                 return false;
             result_state = init_state;
-            Eigen::VectorXd x(nanowire_count), y(nanowire_count);
-            auto data = _mat_theta.diagonal().data();
-            auto max_theta_pt = std::max_element(_mat_theta.data(), _mat_theta.data() + 2 * nanowire_count,
-                                                 [](double &aa, double &bb) {
-                                                     return (std::abs(aa) < std::abs(bb));
-                                                 });
-            if(_nanowire_config->getType()=="cc60")
-                step_length = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * step_length;
-            else if(_nanowire_config->getType()=="cc600")
-                step_length = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * step_length;
+
             int step = 0;
             duration = 0;
             while (distance(init_state, result_state) < max_distance) {
-                for (int k = 0; k < nanowire_count; k++) {
-                    x(k) = result_state(2 * k);
-                    y(k) = result_state(2 * k + 1);
-                }
-                _field->getField(x, y, mat_E, nanowire_count);
+                _field->getField(result_state,_current_height, mat_E, nanowire_count);
                 auto mat_velocity = _mat_theta * mat_E * control * _em / _mu;
-                result_state += step_length * mat_velocity;
+                result_state += _step_length * mat_velocity;
                 if (!validState(result_state))
                     return false;
             }
-            duration = step * step_length;
+            duration = step * _step_length;
             return true;
         }
 
@@ -353,9 +337,9 @@ namespace acsr {
      * @return
      */
         bool reversePropagateByDistance(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control,
-                                        double step_length, double max_distance, Eigen::VectorXd &result_state,
+                                        double max_distance, Eigen::VectorXd &result_state,
                                         double &duration) {
-            return forwardPropagateByDistance(init_state, control, step_length, max_distance, result_state, duration);
+            return forwardPropagateByDistance(init_state, control,max_distance, result_state, duration);
         }
 
         /***

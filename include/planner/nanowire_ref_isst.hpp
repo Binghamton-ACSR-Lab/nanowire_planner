@@ -115,7 +115,7 @@ namespace acsr{
                 if(!_run_flag)return false;
                 auto temp_control = this->_dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
-                if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,PlannerConfig::integration_step,
+                if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,
                                                                    steps,temp_state,temp_duration)){
                     return_value = true;
                     quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::forward)] =
@@ -153,7 +153,7 @@ namespace acsr{
                 if(!_run_flag)return false;
                 auto temp_control = this->_dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
-                if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,PlannerConfig::integration_step,
+                if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,
                                                                    steps,temp_state,temp_duration)){
                     return_value = true;
                     quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::reverse)] =

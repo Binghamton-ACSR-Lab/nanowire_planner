@@ -62,7 +62,7 @@ namespace acsr{
             for(int i=0;i<PlannerConfig::blossomM;i++) {
                 auto temp_control = this->_dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
-                if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,PlannerConfig::integration_step,
+                if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,
                                                                    steps,temp_state,temp_duration)){
                     if(this->_dynamic_system->getHeuristic(temp_state,this->_goal->getState())<heuristic_value){
                         return_value = true;
@@ -95,7 +95,7 @@ namespace acsr{
             for(int i=0;i<PlannerConfig::blossomM;i++) {
                 auto temp_control = this->_dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
-                if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,PlannerConfig::integration_step,
+                if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,
                                                                    steps,temp_state,temp_duration)){
 
                     if(this->_dynamic_system->getHeuristic(temp_state,this->_root->getState())<heuristic_value){

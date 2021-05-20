@@ -599,32 +599,28 @@ namespace acsr {
          * @param mat_E
          * @param wire_count
          */
-        void getField(const Eigen::VectorXd &x, const Eigen::VectorXd &y,const Eigen::VectorXd &z, Eigen::MatrixXd &mat_E, int wire_count) {
-            //assert(x.size() == wire_count);
-            //assert(y.size() == wire_count);
+        void getField(const Eigen::VectorXd &state, const Eigen::VectorXd &height, Eigen::MatrixXd &mat_E, int wire_count) {
             auto pages = nanowire_config->getElectrodesRows() * nanowire_config->getElectrodesCols();
             mat_E.resize(2 * wire_count, pages);
             double ex[2 * wire_count][pages];
-
             if(nanowire_config->getDimension()==2) {
-                for (int k = 0; k < wire_count; k++) {
-                    int i;
-                    for (i = 0; i < pages; i++) {
-                        ex[2 * k][i] = double(interp2d(i, float(x(k)), float(y(k))));
-                        ex[2 * k + 1][i] = double(interp2d(i + pages, float(x(k)), float(y(k))));
+                for (int k = 0; k < wire_count; ++k) {
+                    for (int i = 0; i < pages; ++i) {
+                        ex[2 * k][i] = double(interp2d(i, float(state(2*k)), float(state(2*k+1))));
+                        ex[2 * k + 1][i] = double(interp2d(i + pages, float(state(2*k)), float(state(2*k+1))));
                     }
                 }
             }else if(nanowire_config->getDimension()==3){
-                for(int k=0;k<wire_count;k++){
-                    int i;
-                    for(i=0;i<pages;i++){
-                        ex[2*k][i]=double(interp3d(i,float(x[k]),float(y[k]),float(z[k])));
-                        ex[2*k+1][i]=double(interp3d(i+pages,float(x[k]),float(y[k]),float(z[k])));
+                for(int k=0;k<wire_count;++k){
+                    for(int i=0;i<pages;++i){
+                        ex[2*k][i]=double(interp3d(i,float(state(2*k)),float(state(2*k+1)),float(height(k))));
+                        ex[2*k+1][i]=double(interp3d(i+pages,float(state(2*k)),float(state(2*k+1)),float(height(k))));
                     }
                 }
             }
-            for (int i = 0; i < 2 * wire_count; ++i)
-                mat_E.row(i) = Eigen::VectorXd::Map(&ex[i][0], pages);
+            mat_E = Eigen::Matrix<double,-1,-1,Eigen::RowMajor>::Map(&ex[0][0],2*wire_count,pages);
+            //for (int i = 0; i < 2 * wire_count; ++i)
+                //mat_E.row(i) = Eigen::VectorXd::Map(&ex[i][0], pages);
         }
     };
 }
