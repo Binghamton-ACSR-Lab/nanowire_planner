@@ -26,8 +26,8 @@ namespace acsr{
             po::options_description opt_desc("Options");
             opt_desc.add_options()
                     ("max_distance",po::value<double>(&SystemConfig::max_distance)->default_value(60.0),"max distance.")
-                    ("http_port",po::value<unsigned>(&SystemConfig::http_port)->default_value(8080),"http server port")
-                    ("tcp_port",po::value<unsigned>(&SystemConfig::tcp_port)->default_value(6060),"tcp server port")
+                    ("http_port",po::value<int>(&SystemConfig::http_port)->default_value(8080),"http server port")
+                    ("tcp_port",po::value<int>(&SystemConfig::tcp_port)->default_value(6060),"tcp server port")
                     ;
 
             po::variables_map varmap;

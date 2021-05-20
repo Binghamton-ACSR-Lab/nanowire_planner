@@ -33,17 +33,16 @@ namespace acsr {
 
         void init(){
             //read config files
-            nanowire_config = std::make_shared<NanowireConfig>();
-            nanowire_config->readFile("config/nanowire.cfg");
+
             PlannerConfig::readFile("config/planner.cfg");
             SystemConfig::readFile("config/system.cfg");
-            nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
+
 
             auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
-            tcp_server = std::make_shared<TcpServer> (6060);
+            tcp_server = std::make_shared<TcpServer> (SystemConfig::tcp_port);
             tcp_server->run(callback);
 
-            http_observer = std::make_shared<HttpServer>(8080);
+            http_observer = std::make_shared<HttpServer>(SystemConfig::http_port);
             svg_observer = std::make_shared<SvgObserver>();
             http_observer->run(callback);
             message_displayers.push_back(tcp_server);
@@ -55,7 +54,9 @@ namespace acsr {
 
         void run() {
 
-
+            nanowire_config = std::make_shared<NanowireConfig>();
+            nanowire_config->readFile("config/nanowire.cfg");
+            nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
 
             http_observer->reset();
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
@@ -472,6 +473,10 @@ namespace acsr {
                 showMessage("waiting planner to reset!");
                 planner->stop();
             }
+
+            nanowire_config = std::make_shared<NanowireConfig>();
+            nanowire_config->readFile("config/nanowire.cfg");
+            nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
 
             //read config files
 
