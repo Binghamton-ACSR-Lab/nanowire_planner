@@ -123,8 +123,12 @@ namespace acsr {
             return height;
         }
 
-        double getDimension() const{
+        int getDimension() const{
             return dimension;
+        }
+
+        void setDimension(int dimention){
+            this->dimension = dimention;
         }
 
         /***
@@ -176,7 +180,17 @@ namespace acsr {
      * @return
      */
         std::string getFieldDataFileName() const {
-            return data_file_name;
+            if (type == "cc60") {
+                if(dimension==2)
+                    return "E_Map_4by4_100V_CC60_E.txt";
+                else if(dimension==3)
+                    return "E_Map_4by4_100V_CC60_E_3D.txt";
+            } else if (type == "cc600") {
+                if(dimension==2)
+                    return "E_Map_4by4Mask1_100V_CC600reE.txt";
+                else if(dimension==3)
+                    return "E_Map_4by4_100V_CC600_E_3D_1mm.txt";
+            }
         }
 
         /***
@@ -271,6 +285,7 @@ namespace acsr {
             else {
                 po::store(po::parse_config_file(ifs, opt_desc), varmap);
                 po::notify(varmap);
+                std::cout<<"read nanowire config file completed\n";
             }
 
             if (varmap.count("nanowire_count")) {
@@ -304,7 +319,11 @@ namespace acsr {
                         data_file_name = "E_Map_4by4_100V_CC60_E_3D.txt";
                 } else if (type == "cc600") {
                     row_space = column_space = 600e-6;
-                    data_file_name = "E_Map_4by4Mask1_100V_CC600reE.txt";
+                    if(dimension==2)
+                        data_file_name = "E_Map_4by4Mask1_100V_CC600reE.txt";
+                    else if(dimension==3)
+                        data_file_name = "E_Map_4by4_100V_CC600_E_3D_1mm.txt";
+
                 } else {
                     std::cout << "no such config type\n";
                 }
@@ -332,6 +351,12 @@ namespace acsr {
 
             if (varmap.count("field_data_cols")) {
                 field_data_cols = varmap["field_data_cols"].as<int>();
+            } else {
+                std::cout << "Nanowire Config File Error\n";
+            }
+
+            if (varmap.count("field_data_layers")) {
+                field_data_layers = varmap["field_data_layers"].as<int>();
             } else {
                 std::cout << "Nanowire Config File Error\n";
             }
@@ -513,7 +538,7 @@ namespace acsr {
 
             auto layers = nanowire_config->getFieldDataLayers();
             auto rows = nanowire_config->getFieldDataRows();
-            auto columns = nanowire_config->getElectrodesCols();
+            auto columns = nanowire_config->getFieldDataCols();
 
             if (!boost::filesystem::exists(binary_file_name)) {
                 std::ifstream myfile(file_str);

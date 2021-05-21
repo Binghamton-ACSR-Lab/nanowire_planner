@@ -94,14 +94,14 @@ namespace acsr {
             setZetaPotential(zp);
 
             _state_low_bound.resize(2 * nanowire_count);
-            _state_low_bound.setConstant(0);
+            _state_low_bound.setConstant(10e-6);
 
             _state_upper_bound.resize(2 * nanowire_count);
             for (auto i = 0; i < nanowire_count; ++i) {
                 _state_upper_bound(2 * i) =
-                        nanowire_config->getColumnSpace() * (nanowire_config->getElectrodesCols() - 1);
+                        nanowire_config->getColumnSpace() * (nanowire_config->getElectrodesCols() - 1)-10e-6;
                 _state_upper_bound(2 * i + 1) =
-                        nanowire_config->getRowSpace() * (nanowire_config->getElectrodesRows() - 1);
+                        nanowire_config->getRowSpace() * (nanowire_config->getElectrodesRows() - 1)-10e-6;
             }
 
             _control_dimension = nanowire_config->getElectrodesRows() * nanowire_config->getElectrodesCols();
@@ -443,7 +443,7 @@ namespace acsr {
                                                  });
 
 
-            if (!optimize(x0, xt, _step_length, states, controls)) {
+            if (!optimize(x0, xt, states, controls)) {
                 return false;
             }
 
@@ -463,7 +463,7 @@ namespace acsr {
      * override DynamicSystem function
      * @return
      */
-        bool optimize(ACADO::DVector x0, ACADO::DVector xt, double int_step,
+        bool optimize(ACADO::DVector x0, ACADO::DVector xt,
                       std::shared_ptr<ACADO::VariablesGrid> states,
                       std::shared_ptr<ACADO::VariablesGrid> controls) {
             USING_NAMESPACE_ACADO
@@ -480,20 +480,17 @@ namespace acsr {
             u.clearStaticCounters();
             T.clearStaticCounters();
 
-            Eigen::VectorXd x_position(nanowire_count), y_position(nanowire_count);
+            //Eigen::VectorXd x_position(nanowire_count), y_position(nanowire_count);
             int iterator = 0;
 
             while ((x0 - xt).norm() > PlannerConfig::goal_radius && _run_flag) {
                 if (iterator++ >= 5)
                     return false;
 
-                for (auto i = 0; i < nanowire_count; ++i) {
-                    x_position(i) = (x0(2 * i) + xt(2 * i)) / 2;//x0(2*i);
-                    y_position(i) = (x0(2 * i + 1) + xt(2 * i + 1)) / 2;//x0(2*i+1);
-                }
+                auto state = (x0+xt)/2;
 
                 Eigen::MatrixXd mat_E;
-                _field->getField(x_position, y_position, mat_E, nanowire_count);
+                _field->getField(state, _current_height, mat_E, nanowire_count);
                 ACADO::DMatrix B = _mat_theta * mat_E * _em / _mu;
 
                 ///set differerntial equation
@@ -515,7 +512,7 @@ namespace acsr {
                     ocp.subjectTo(_state_low_bound(n) <= x(n) <= _state_upper_bound(n));
                 }
                 ///maximum time
-                ocp.subjectTo(int_step <= T <= 400);
+                ocp.subjectTo(_step_length <= T <= 1000*_step_length);
 
                 ///define algorithm as solve
                 ACADO::OptimizationAlgorithm algorithm(ocp);
@@ -539,7 +536,7 @@ namespace acsr {
                     x.clearStaticCounters();
                     u.clearStaticCounters();
                     T.clearStaticCounters();
-                    if (!optimize(x0, xt_new, int_step, states, controls))
+                    if (!optimize(x0, xt_new, states, controls))
                         return false;
                     x0 = states->getLastVector();
                     x.clearStaticCounters();
@@ -563,15 +560,17 @@ namespace acsr {
 
                     controls->addVector(vec_u, current_time + time_point);
                     while (current_time < (index + 1) * time_interval) {
+                        /*
                         for (int k = 0; k < nanowire_count; k++) {
                             x_position(k) = curr_state(2 * k);
                             y_position(k) = curr_state(2 * k + 1);
-                        }
-                        _field->getField(x_position, y_position, mat_E, nanowire_count);
+                        }*/
+
+                        _field->getField(curr_state, _current_height, mat_E, nanowire_count);
 
                         ACADO::DVector mat_velocity = _mat_theta * mat_E * vec_u * _em / _mu;
-                        curr_state += mat_velocity * int_step;
-                        current_time += int_step;
+                        curr_state += mat_velocity * _step_length;
+                        current_time += _step_length;
                         if(!_run_flag)return false;
                         if (!validState(curr_state))
                             return false;

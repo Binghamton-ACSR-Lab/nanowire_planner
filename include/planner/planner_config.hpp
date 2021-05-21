@@ -113,7 +113,7 @@ namespace acsr{
             {
                 po::store( po::parse_config_file( ifs, opt_desc ), varmap );
                 po::notify( varmap );
-                std::cout << "read config file done.\n" << std::endl;
+                std::cout << "read planner config file done.\n" << std::endl;
             }
 
             std::vector<double> state;

@@ -37,12 +37,17 @@ namespace acsr {
             PlannerConfig::readFile("config/planner.cfg");
             SystemConfig::readFile("config/system.cfg");
 
+            nanowire_config = std::make_shared<NanowireConfig>();
+            nanowire_config->readFile("config/nanowire.cfg");
+
 
             auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
             tcp_server = std::make_shared<TcpServer> (SystemConfig::tcp_port);
+            std::cout<<"start tcp server at port "<<SystemConfig::tcp_port<<std::endl;
             tcp_server->run(callback);
 
             http_observer = std::make_shared<HttpServer>(SystemConfig::http_port);
+            std::cout<<"start http server at port "<<SystemConfig::http_port<<std::endl;
             svg_observer = std::make_shared<SvgObserver>();
             http_observer->run(callback);
             message_displayers.push_back(tcp_server);
@@ -227,6 +232,7 @@ namespace acsr {
                     showMessage(msg);
                     return msg;
                 }
+                nanowire_config->setDimension(_field_dimension);
 
                 msg ="";
                 {
@@ -234,10 +240,10 @@ namespace acsr {
                     msgs.push_back("nano wire count: " + std::to_string(_n_wires));
                     for (int i = 0; i < _n_wires; i++) {
                         msgs.push_back("--Nano Wire " + std::to_string(i + 1) + ": start point: " +
-                                       std::to_string(_init_states[2 * i]) + "," +
-                                       std::to_string(_init_states[2 * i + 1])
-                                       + "; destination point: " + std::to_string(_target_states[2 * i]) + "," +
-                                       std::to_string(_target_states[2 * i + 1]) + ": current height: " + std::to_string(_height[i]));
+                                       std::to_string(int(_init_states[2 * i]*1e6)) + "," +
+                                       std::to_string(int(_init_states[2 * i + 1]*1e6))
+                                       + "; destination point: " + std::to_string(int(_target_states[2 * i]*1e6)) + "," +
+                                       std::to_string(int(_target_states[2 * i + 1]*1e6)) + ": current height: " + std::to_string(int(_height[i]*1e6)));
                     }
                     std::string str = "--Zeta Potential: ";
                     for (int i = 0; i < 2 * _n_wires; i++) {
@@ -288,6 +294,7 @@ namespace acsr {
                 std::vector<double> temp_height(_n_wires);
 
                 try {
+                    _field_dimension = std::stoi(strs[2]);
                     for (int i=0;i<2*_n_wires;i++) {
                         temp_zeta[i] = std::stod(strs[3 + i]);
                         temp_init_states[i] = std::stod(strs[3 + 2 * _n_wires + i]) * 1e-6;
@@ -300,6 +307,7 @@ namespace acsr {
                     showMessage(msg);
                     return msg;
                 }
+                nanowire_config->setDimension(_field_dimension);
 
                 bool zeta_flag = true;
                 for (int i=0;i<2*_n_wires;i++) {
@@ -343,8 +351,8 @@ namespace acsr {
                     msgs.push_back("nano wire count: " + std::to_string(_n_wires));
                     for (int i = 0; i < _n_wires; i++) {
                         msgs.push_back("--Nano Wire " + std::to_string(i + 1) + ": start point: " +
-                                       std::to_string(_init_states[2 * i]) + "," +
-                                       std::to_string(_init_states[2 * i + 1]) + ": current height: " + std::to_string(_height[i]));
+                                       std::to_string(int(_init_states[2 * i]*1e6)) + "," +
+                                       std::to_string(int(_init_states[2 * i + 1]*1e6)) + ": current height: " + std::to_string(int(_height[i]*1e6)));
                     }
                     std::string str = "Reset:\n--Zeta Potential: ";
                     for (int i = 0; i < 2 * _n_wires; i++) {
@@ -474,19 +482,20 @@ namespace acsr {
                 planner->stop();
             }
 
-            nanowire_config = std::make_shared<NanowireConfig>();
-            nanowire_config->readFile("config/nanowire.cfg");
-            nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
+            //nanowire_config = std::make_shared<NanowireConfig>();
+            //nanowire_config->readFile("config/nanowire.cfg");
+            //nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
 
             //read config files
 
             http_observer->reset();
 
-            nanowire_config->readFile("config/nanowire.cfg");
+
             nanowire_config->setNanowireCount(_n_wires);
             nanowire_config->setZeta(zeta);
-            //Config::readFile("config/planner.cfg");
             nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
+            nanowire_system->setStart();
+
             Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),nanowire_system->getRobotCount());
             nanowire_system->setHeight(height_vec);
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
@@ -567,6 +576,7 @@ namespace acsr {
 
             Eigen::Map<Eigen::VectorXd> zp(zeta.data(), 2 * nanowire_config->getNanowireCount());
             nanowire_system->setZetaPotential(zp);
+            nanowire_system->setStart();
 
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
             planner->setStartState(Eigen::Map<Eigen::VectorXd>(_init_states.data(),2*_n_wires));

@@ -31,6 +31,16 @@ namespace acsr{
                     ;
 
             po::variables_map varmap;
+            std::ifstream ifs( file_name.c_str());
+            if( !ifs.is_open() )
+                std::cout << "no such file." << std::endl;
+            else
+            {
+                po::store( po::parse_config_file( ifs, opt_desc ), varmap );
+                po::notify( varmap );
+                std::cout << "read system config file done.\n" << std::endl;
+            }
+
             SystemConfig::max_distance*=1e-6;
         }
     };
