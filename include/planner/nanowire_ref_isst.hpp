@@ -27,7 +27,7 @@ namespace acsr{
             SST::setup(nanowire_config);
             ///generating global reference path & storing it to "reference_path.txt"
             GlobalPath global_path;
-            global_path.init(_dynamic_system->getRobotCount(),_init_state,_target_state,nanowire_config);
+            global_path.init(_dynamic_system->getRobotCount(),_init_state,_target_state);
             global_path.getStartTargetElectordes();
             VariablesGrid states;
             global_path.generateBestReferenceTrajectory(states);

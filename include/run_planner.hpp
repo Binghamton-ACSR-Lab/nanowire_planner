@@ -133,7 +133,7 @@ namespace acsr {
                     break;
                 }
                 svg_observer->update();
-                std::this_thread::sleep_for (std::chrono::seconds(2));
+                std::this_thread::sleep_for (std::chrono::seconds(5));
             }
 
             reverse_run_flag = false;
@@ -171,7 +171,7 @@ namespace acsr {
                     std::cout.flush();
                     svg_observer->update();
                 }
-                std::this_thread::sleep_for (std::chrono::seconds(2));
+                std::this_thread::sleep_for (std::chrono::seconds(5));
             }
         }
 
@@ -240,7 +240,7 @@ namespace acsr {
                     showMessage(msg);
                     return msg;
                 }
-                nanowire_config->setDimension(_field_dimension);
+                NanowireConfig::dimension = _field_dimension;
 
                 msg ="";
                 {
@@ -315,8 +315,7 @@ namespace acsr {
                     showMessage(msg);
                     return msg;
                 }
-                nanowire_config->setDimension(_field_dimension);
-
+                NanowireConfig::dimension = _field_dimension;
                 bool zeta_flag = true;
                 for (int i=0;i<2*_n_wires;i++) {
                     if(std::abs(temp_zeta[i]-zeta[i])>0.01){

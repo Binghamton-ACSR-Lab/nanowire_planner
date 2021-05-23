@@ -19,15 +19,15 @@ namespace acsr {
 
         virtual ~GlobalPath() = default;
 
-        bool init(int wire_count,const Eigen::VectorXd &init_state, const Eigen::VectorXd &target_state,std::shared_ptr<NanowireConfig> nanowire_config) {
+        bool init(int wire_count,const Eigen::VectorXd &init_state, const Eigen::VectorXd &target_state) {
 
-            if(nanowire_config->getType()=="cc600") {
+            if(NanowireConfig::type=="cc600") {
                 if (!boost::filesystem::exists("data/reference_speed_cc600.txt")) {
                     std::cout << "Reference data for cc600 is missing";
                     return false;
                 }
                 ref_time.read("data/reference_speed_cc600.txt");
-            }else if(nanowire_config->getType()=="cc60"){
+            }else if(NanowireConfig::type=="cc60"){
                 if (!boost::filesystem::exists("data/reference_speed_cc60.txt")) {
                     std::cout << "Reference data for cc60 is missing";
                     return false;
@@ -37,19 +37,15 @@ namespace acsr {
                     ref_time.setVector(i,ref_time.getVector(i)*1e-6);
                     ref_time.setTime(i,ref_time.getTime(i)*1.5);
                 }
-                //ref_time.print(std::cout);
             }
 
-            //_n_wires = nanowire_config->getNanowireCount();
             _n_wires = wire_count;
             _init_state = init_state;
             _target_state = target_state;
-            _nanowire_config = nanowire_config;
 
             double multiply = 1.0;
             if (_init_state.size()/2 > 3) {
                 multiply = multiply + 0.30 * (_init_state.size()/2 - 2);
-
                 for (auto i = 0; i < ref_time.getNumPoints(); ++i) {
                     ref_time.setTime(i, multiply * ref_time.getTime(i));
                 }
@@ -65,23 +61,22 @@ namespace acsr {
                 target_state_vectors.push_back({_target_state(2*i),_target_state(2*i+1)});
             }
 
-            auto temp_start_vectors = _nanowire_config->getNearElectrodes(init_state_vectors.front());
-
+            auto temp_start_vectors = NanowireConfig::getNearElectrodes(init_state_vectors.front());
             std::for_each(temp_start_vectors.begin(),temp_start_vectors.end(),[&](const Eigen::Vector2i& pt){
                 start_vectors.push_back(ElectordePositionType{pt});
             });
 
             for(uint i=1;i<_n_wires;++i){
-                auto temp = _nanowire_config->getNearElectrodes(init_state_vectors[i]);
+                auto temp = NanowireConfig::getNearElectrodes(init_state_vectors[i]);
                 start_vectors = combineVectors(start_vectors,temp);
             }
 
-            auto temp_target_vectors = _nanowire_config->getNearElectrodes(target_state_vectors.front());
+            auto temp_target_vectors = NanowireConfig::getNearElectrodes(target_state_vectors.front());
             std::for_each(temp_target_vectors.begin(),temp_target_vectors.end(),[&](const Eigen::Vector2i& pt){
                 target_vectors.push_back(ElectordePositionType{pt});
             });
             for(uint i=1;i<_n_wires;++i){
-                auto temp = _nanowire_config->getNearElectrodes(target_state_vectors[i]);
+                auto temp = NanowireConfig::getNearElectrodes(target_state_vectors[i]);
                 target_vectors = combineVectors(target_vectors,temp);
             }
 
@@ -239,7 +234,6 @@ namespace acsr {
         VariablesGrid ref_time;
         int _n_wires;
         Eigen::VectorXd _init_state, _target_state;
-        std::shared_ptr<NanowireConfig> _nanowire_config;
         std::vector<std::pair<ElectordePositionType,ElectordePositionType>> global_start_target;
 
     private:
@@ -259,10 +253,10 @@ namespace acsr {
 
         double generateSingleInitSegmentTrajectory(const Eigen::Vector2d& nanowire_position,const Eigen::Vector2i& electrode_position,VariablesGrid &single_state)
         {
-            const auto d_start = (_nanowire_config->electrodePositionToPosition(electrode_position)-nanowire_position).norm();
+            const auto d_start = (NanowireConfig::electrodePositionToPosition(electrode_position)-nanowire_position).norm();
             uint index_start;
             for (index_start = 0; index_start<ref_time.getNumPoints();++index_start) {
-                if(_nanowire_config->getColumnSpace()-ref_time.getVector(index_start)(0)<d_start)
+                if(NanowireConfig::electrodes_space-ref_time.getVector(index_start)(0)<d_start)
                     break;
             }
             auto init_time = ref_time.getTime(index_start);
@@ -270,7 +264,7 @@ namespace acsr {
             single_state.addVector(nanowire_position,0.0);
 
             for (auto j = index_start+1; j<ref_time.getNumPoints();++j) {
-                DVector vec = nanowire_position + (d_start-(_nanowire_config->getColumnSpace()-ref_time.getVector(j)(0))) / d_start * (_nanowire_config->electrodePositionToPosition(electrode_position)-nanowire_position);
+                DVector vec = nanowire_position + (d_start-(NanowireConfig::electrodes_space-ref_time.getVector(j)(0))) / d_start * (NanowireConfig::electrodePositionToPosition(electrode_position)-nanowire_position);
                 single_state.addVector(vec,ref_time.getTime(j)-init_time);
             }
             return d_start;
@@ -280,14 +274,14 @@ namespace acsr {
                                                     const Eigen::Vector2d& nanowire_position,
                                                     VariablesGrid &single_state)
         {
-            const auto start = _nanowire_config->electrodePositionToPosition(electrode_position);
+            const auto start = NanowireConfig::electrodePositionToPosition(electrode_position);
             auto d_end = (start-nanowire_position).norm();
             single_state.init();
             uint j = 0;
             for (j = 0; j<ref_time.getNumPoints();++j) {
                 if(ref_time.getVector(j)(0)>d_end)
                     break;
-                DVector vec = start + ref_time.getVector(j)(0) / _nanowire_config->getColumnSpace() * (nanowire_position-start);
+                DVector vec = start + ref_time.getVector(j)(0) / NanowireConfig::electrodes_space * (nanowire_position-start);
                 single_state.addVector(vec,ref_time.getTime(j));
             }
             single_state.addVector(nanowire_position,ref_time.getTime(j+1));
@@ -298,19 +292,16 @@ namespace acsr {
                                                        const Eigen::Vector2i& electrode_target,
                                                        VariablesGrid &single_state)
         {
-            const auto start = _nanowire_config->electrodePositionToPosition(electrode_start);
-            const auto target = _nanowire_config->electrodePositionToPosition(electrode_target);
+            const auto start = NanowireConfig::electrodePositionToPosition(electrode_start);
+            const auto target = NanowireConfig::electrodePositionToPosition(electrode_target);
             single_state.init();
             for (auto j = 0; j<ref_time.getNumPoints();++j) {
-                DVector vec = start + ref_time.getVector(j)(0) / _nanowire_config->getColumnSpace() * (target-start);
+                DVector vec = start + ref_time.getVector(j)(0) / NanowireConfig::electrodes_space * (target-start);
                 single_state.addVector(vec,ref_time.getTime(j));
             }
         }
 
-
-        double generateInitSegmentTrajectory(const ElectordePositionType &electrode,
-                                             VariablesGrid &state)
-        {
+        double generateInitSegmentTrajectory(const ElectordePositionType &electrode,VariablesGrid &state){
             state.init();
             std::vector<VariablesGrid> grids;
 

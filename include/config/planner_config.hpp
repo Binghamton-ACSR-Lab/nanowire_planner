@@ -18,16 +18,9 @@ namespace acsr{
         virtual ~PlannerConfig()=default;
 
         static double integration_step;
-        //static std::string stopping_type;
-        //static double stopping_check;
-        //static std::string stats_type;
-        //static double stats_check;
         static double total_time;
-
         static int random_seed;
-
         static PlannerType planner;
-        //static DynamicSystemType dynamic_system;
         static Eigen::VectorXd init_state;
         static Eigen::VectorXd goal_state;
         static double goal_radius;
@@ -35,11 +28,6 @@ namespace acsr{
         static bool intermedia_control;
         static bool optimization;
         static double optimization_distance;
-        //static bool intermediate_visualization;
-
-        //parameters for rrt star
-        //static double rrt_delta_near;
-        //static double rrt_delta_explore;
 
         //parameters for SST
         static double sst_delta_near;
@@ -66,24 +54,13 @@ namespace acsr{
         static void readFile(std::string file_name){
             po::options_description opt_desc("Options");
             opt_desc.add_options()
-                    //("help","Print available options.") ("config", po::value< std::string >( &config_file_name )->default_value("../input/default.cfg"),
-                    //"The name of a file to read for options (default is ../input/default.cfg). Command-line options"
-                    //" override the ones in the config file. A config file may contain lines with syntax"
-                    //"\n'long_option_name = value'\nand comment lines that begin with '#'." )
-                    ("integration_step",po::value<double>(&PlannerConfig::integration_step),"Integration step for propagations.")
-                    //("stopping_type",po::value<std::string>(&Config::stopping_type),"Condition for terminating planner (iterations or time).")
-                    //("stopping_check",po::value<double>(&Config::stopping_check),"Amount of time or iterations to execute.")
-                    //("stats_type",po::value<std::string>(&Config::stats_type),"Condition for printing statistics of a planner (iterations or time).")
-                    //("stats_check",po::value<double>(&Config::stats_check),"Frequency of statistics gathering.")
-                    //("intermediate_visualization",po::value<bool>(&Config::intermediate_visualization)->default_value(false),"Flag denoting generating images during statistics gathering.")
-                    ("min_time_steps",po::value<unsigned>(&PlannerConfig::min_time_steps),"Minimum number of simulation steps per local planner propagation.")
+                    ("integration_step",po::value<double>(&PlannerConfig::integration_step),"Integration step for propagations.")                    ("min_time_steps",po::value<unsigned>(&PlannerConfig::min_time_steps),"Minimum number of simulation steps per local planner propagation.")
                     ("max_time_steps",po::value<unsigned>(&PlannerConfig::max_time_steps),"Maximum number of simulation steps per local planner propagation.")
                     ("total_time",po::value<double>(&PlannerConfig::total_time),"total running time.")
                     ("random_seed",po::value<int>(&PlannerConfig::random_seed),"Random seed for the planner.")
                     ("sst_delta_near",po::value<double>(&PlannerConfig::sst_delta_near),"The radius for BestNear in SST.")
                     ("sst_delta_drain",po::value<double>(&PlannerConfig::sst_delta_drain),"The radius for witness nodes in SST.")
                     ("planner",po::value<std::string>(),"A string for the planner to run.")
-                    //("system",po::value<std::string>(),"A string for the system to plan for.")
                     ("start_state", po::value<std::string >(), "The given start state. Input is in the format of \"0 0\"")
                     ("goal_state", po::value<std::string >(), "The given goal state. Input is in the format of \"0 0\"")
                     ("goal_radius",po::value<double>(&PlannerConfig::goal_radius),"The radius for the goal region.")
@@ -93,8 +70,6 @@ namespace acsr{
                     ("optimization_distance",po::value<double>(&PlannerConfig::optimization_distance)->default_value(0.0),"optimization begins if distance within this value")
                     ("image_width",po::value<int>(&PlannerConfig::image_width),"Width of output images.")
                     ("image_height",po::value<int>(&PlannerConfig::image_height),"Height of output images.")
-                    //("rrt_delta_near",po::value<double>(&Config::rrt_delta_near),"rrt star nearest range.")
-                    //("rrt_delta_explore",po::value<double>(&Config::rrt_delta_explore),"rrt star explore distance.")
                     ("blossom_m",po::value<unsigned>(&PlannerConfig::blossomM),"isst blossom parameter.")
                     ("blossom_n",po::value<unsigned>(&PlannerConfig::blossomN),"ref-isst blossom parameter.")
                     ("dominant_path_count",po::value<int>(&PlannerConfig::dominant_path_count),"ref-isst quality index count.")
@@ -162,10 +137,6 @@ namespace acsr{
     };
 
     double PlannerConfig::integration_step;
-    //std::string Config::stopping_type;
-    // Config::stopping_check;
-    //std::string Config::stats_type;
-    //double Config::stats_check;
     unsigned PlannerConfig::min_time_steps;
     unsigned PlannerConfig::max_time_steps;
     int PlannerConfig::random_seed;

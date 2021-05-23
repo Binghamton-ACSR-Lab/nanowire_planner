@@ -18,7 +18,6 @@ namespace acsr {
         const std::vector<Color> node_colors={Color::Black,Color::Purple,Color::Orange,Color::Red};
         const double zoom = 1.0/3.0;
         std::string directory_name;
-        std::shared_ptr <NanowireConfig> _nanowire_config;
         double width,height;
         Document original_image;
         Document solution_image;
@@ -49,9 +48,8 @@ namespace acsr {
          */
         void setNanowireConfig(int wire_count, const std::shared_ptr<NanowireConfig>& config){
             _n_wire = wire_count;
-            _nanowire_config = config;
-            width = 600*(_nanowire_config->getElectrodesCols()-1) *zoom;
-            height = 600*(_nanowire_config->getElectrodesRows()-1) *zoom;
+            width = 600*(NanowireConfig::electrodes_columns-1) *zoom;
+            height = 600*(NanowireConfig::electrodes_rows-1) *zoom;
         }
 
 
@@ -214,25 +212,25 @@ namespace acsr {
                    << Point(dimensions.width, dimensions.height) << Point(0, dimensions.height);
             svg << border;
             ///draw cell edge
-            double col_space = width / (_nanowire_config->getElectrodesCols() - 1);
-            double row_space = height / (_nanowire_config->getElectrodesRows() - 1);
+            double col_space = width / (NanowireConfig::electrodes_columns - 1);
+            double row_space = height / (NanowireConfig::electrodes_rows - 1);
             Stroke stroke(width/400, Color::Black);
             ///horizontal edges
-            for (auto i = 0; i < _nanowire_config->getElectrodesRows(); ++i) {
+            for (auto i = 0; i < NanowireConfig::electrodes_rows; ++i) {
                 Line line(Point(0.05 * width, 0.05 * height + i * row_space),
                           Point(1.05 * width, 0.05 * height + i * row_space), stroke);
                 svg << line;
             }
             /// vertical edges
-            for (auto i = 0; i < _nanowire_config->getElectrodesCols(); ++i) {
+            for (auto i = 0; i < NanowireConfig::electrodes_columns; ++i) {
                 Line line(Point(0.05 * width + i * col_space, 0.05 * height),
                           Point(0.05 * width + i * col_space, 1.05 * height),
                           stroke);
                 svg << line;
             }
             ///draw electrodes
-            for (auto i = 0; i < _nanowire_config->getElectrodesRows(); ++i) {
-                for (auto j = 0; j < _nanowire_config->getElectrodesCols(); ++j) {
+            for (auto i = 0; i < NanowireConfig::electrodes_rows; ++i) {
+                for (auto j = 0; j < NanowireConfig::electrodes_columns; ++j) {
                     Circle circle(
                             Point(0.05 * width + j * col_space, 0.05 * height + i * row_space),
                             width/20, Fill(Color::Green));
@@ -265,9 +263,9 @@ namespace acsr {
          */
         inline Point convertStateToImagePoint(const Eigen::VectorXd &state, int robot_index) {
             return Point(
-                    zoom * (state(robot_index * 2)*600/_nanowire_config->getColumnSpace() ) +
+                    zoom * (state(robot_index * 2)*600/NanowireConfig::electrodes_space ) +
                     0.05 * width,
-                    zoom * (state(robot_index * 2 + 1)*600/_nanowire_config->getColumnSpace() ) +
+                    zoom * (state(robot_index * 2 + 1)*600/NanowireConfig::electrodes_space ) +
                     0.05 * height
             );
         }

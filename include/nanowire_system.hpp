@@ -54,7 +54,6 @@ namespace acsr {
         int _n_wire;
         int _control_dimension = 16;
         std::atomic_bool _run_flag;
-        std::shared_ptr<NanowireConfig> _nanowire_config;
         std::shared_ptr<EpField> _field;
 
         Eigen::VectorXd _state_low_bound;
@@ -83,18 +82,10 @@ namespace acsr {
      * constructor
      * @param nanowire_config a NanowireConfig pointer where store the config of the system
      */
-        NanowireSystem(int wire_count,const std::shared_ptr<NanowireConfig>& nanowire_config):_nanowire_config(nanowire_config){
-            _field = std::make_shared<EpField>(nanowire_config);
+        NanowireSystem(int wire_count,const std::shared_ptr<NanowireConfig>& nanowire_config){
+            _field = std::make_shared<EpField>();
             _field->readFile();
-            //auto nanowire_count = _nanowire_config->getNanowireCount();
-            //_state_dimension = 2 * nanowire_count;
             _n_wire = wire_count;
-
-            ///set zeta
-            /*
-            auto zp_vec = nanowire_config->getZetaPotentialVec();
-            Eigen::Map<Eigen::VectorXd> zp(zp_vec.data(), 2 * nanowire_count);*/
-            //setZetaPotential(zp);
 
             _state_low_bound.resize(2 * _n_wire);
             _state_low_bound.setConstant(10e-6);
@@ -102,12 +93,12 @@ namespace acsr {
             _state_upper_bound.resize(2 * _n_wire);
             for (auto i = 0; i < _n_wire; ++i) {
                 _state_upper_bound(2 * i) =
-                        nanowire_config->getColumnSpace() * (nanowire_config->getElectrodesCols() - 1)-10e-6;
+                        NanowireConfig::electrodes_space * (NanowireConfig::electrodes_columns - 1)-10e-6;
                 _state_upper_bound(2 * i + 1) =
-                        nanowire_config->getRowSpace() * (nanowire_config->getElectrodesRows() - 1)-10e-6;
+                        NanowireConfig::electrodes_space * (NanowireConfig::electrodes_rows - 1)-10e-6;
             }
 
-            _control_dimension = nanowire_config->getElectrodesRows() * nanowire_config->getElectrodesCols();
+            _control_dimension = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
             _control_low_bound.resize(_control_dimension);
             _control_low_bound.setZero();
             _control_upper_bound.resize(_control_dimension);
@@ -170,37 +161,6 @@ namespace acsr {
             return 2*_n_wire;
         }
 
-        /*
-        void setStateDimension(size_t dimension){
-            _state_dimension = dimension;
-        }*/
-
-
-
-
-
-        auto getConfig(){
-            return _nanowire_config;
-        }
-
-        /***
-     * override DynamicSystem function
-     * @return
-     */
-     /*
-        double getWidth() const override {
-            return nanowire_config->getColumnSpace() * (nanowire_config->getElectrodesCols() - 1) * 1e6;
-        }
-    */
-        /***
-     * override DynamicSystem function
-     * @return
-     */
-     /*
-        double getHeight() const override {
-            return nanowire_config->getRowSpace() * (nanowire_config->getElectrodesRows() - 1) * 1e6;
-        }
-    */
 
 
         /***
@@ -589,24 +549,14 @@ namespace acsr {
             return true;
         }
 
-        /*
-        void setReferencePath(const std::shared_ptr<ReferencePath>& path){
-            reference_path = path;
-        }
-        VariablesGrid getReferencePathState(){
-            return reference_path->getStates();
-        }*/
-
-
-
-
     protected:
         const double MAX_VELOCITY = 1e-7;
         std::vector<int> dominant_index;
+
         /***
-     * override DynamicSystem function
-     * @return
-     */
+         * override DynamicSystem function
+         * @return
+         */
         bool validState(const Eigen::VectorXd &state) {
             //auto nanowire_count = _nanowire_config->getNanowireCount();
             for (unsigned i = 0; i < _n_wire - 1; i++) {
@@ -625,17 +575,15 @@ namespace acsr {
         }
 
         void updateStepLength(){
-            //auto nanowire_count = _nanowire_config->getNanowireCount();
             auto max_theta_pt = std::max_element(_mat_theta.data(), _mat_theta.data() + 2 * _n_wire,
                                                  [](double &aa, double &bb) {
                                                      return (std::abs(aa) < std::abs(bb));
                                                  });
-            //double int_step_max;
-            if(_nanowire_config->getType()=="cc60")
+            if(NanowireConfig::type=="cc60")
                 _step_length = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * PlannerConfig::integration_step;
-            else if(_nanowire_config->getType()=="cc600")
+            else if(NanowireConfig::type=="cc600")
                 _step_length = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * PlannerConfig::integration_step;
-            if(_nanowire_config->getDimension()==3) {
+            if(NanowireConfig::dimension==3) {
                 auto x = _current_height.maxCoeff();
                 _step_length *= 10 * 2e-7 / (-7e-7 * std::log(x/1.02) - 5e-6);
             }

@@ -61,56 +61,32 @@ namespace acsr {
 
 
     class NanowireConfig {
-    private:
+    public:
 
-        std::string type;
-
-        int dimension;
-
-        double row_space;///electrodes row space
-
-        double column_space;///electrodes column space
-
-        double height;///electrodes column space
-
-        int electrodes_row;///electrodes rows
-
-        int electrodes_column;///electrodes columns
-
-        int field_data_rows;///the field data parameter
-
-        int field_data_cols;///the field data parameter
-
-        int field_data_layers;///the field data parameter
-
-        std::string data_file_name;///field data file name
-
-        //int nanowire_count;///nanowire count
-
-        int nanowire_index_for_image;    ///the nanowire index for the path shown in image
-
-        ///std::vector<double> zeta_potential_vec;///zeta potential
-
+        static std::string type;
+        static int dimension;
+        static double electrodes_space;///electrodes row space
+        static double field_height;///electrodes column space
+        static int electrodes_rows;///electrodes rows
+        static int electrodes_columns;///electrodes columns
+        static int field_data_rows;///the field data parameter
+        static int field_data_cols;///the field data parameter
+        static int field_data_layers;///the field data parameter
 
     public:
         /***
-     * constructor
-     */
+         * constructor
+         */
         NanowireConfig() = default;
 
         /***
-     * destructor
-     */
+         * destructor
+         */
         virtual ~NanowireConfig() = default;
-
         NanowireConfig(const NanowireConfig &) = delete;
-
         NanowireConfig operator=(const NanowireConfig &) = delete;
 
-        /***
-     * get electrodes row space
-     * @return
-     */
+        /*
         double getRowSpace() const {
             return row_space;
         }
@@ -131,42 +107,24 @@ namespace acsr {
             this->dimension = dimention;
         }
 
-        /***
-         * get electrodes space
-         * @return
-         */
         double getColumnSpace() const {
             return column_space;
         }
 
-        /***
-         * get electrodes rows
-         * @return
-         */
         int getElectrodesRows() const {
             return electrodes_row;
         }
 
-        /***
-     * get electrodes columns
-     * @return
-     */
         int getElectrodesCols() const {
             return electrodes_column;
         }
 
-        /***
-         * get field data rows(181)
-         * @return
-         */
+
         int getFieldDataRows() const {
             return field_data_rows;
         }
 
-        /***
-     * get field data columns(181)
-     * @return
-     */
+
         int getFieldDataCols() const {
             return field_data_cols;
         }
@@ -174,12 +132,13 @@ namespace acsr {
         int getFieldDataLayers() const{
             return field_data_layers;
         }
+        */
 
         /***
          * get field data file name
-         * @return
+         * @return field data file name
          */
-        std::string getFieldDataFileName() const {
+        static std::string getFieldDataFileName() {
             if (type == "cc60") {
                 if(dimension==2)
                     return "E_Map_4by4_100V_CC60_E.txt";
@@ -194,48 +153,40 @@ namespace acsr {
         }
 
         /***
-         * get nanowire count
-         * @return
+         * get convert electrode position to nanowire position
+         * @param electrode_position electrode position
+         * @return nanowire position
          */
-         /*
-        int getNanowireCount() const {
-            return nanowire_count;
-        }*/
+        static Eigen::Vector2d electrodePositionToPosition(const Eigen::Vector2i &electrode_position) {
+            if (electrode_position(0) >= electrodes_rows || electrode_position(0) < 0 ||
+                electrode_position(1) >= electrodes_columns || electrode_position(1) < 0)
+                return {-1.0, -1.0};
+            return {electrodes_space * electrode_position(1), electrodes_space * electrode_position(0)};
+        }
 
         /***
-         * get the nanowire index for the path shown in image
-         * @return
+         * get near electrodes for a given nanowire position
+         * @param pt nanowire position
+         * @return near electrodes vector
          */
-        int getNanowirePathIndex() const {
-            return nanowire_index_for_image;
-        }
-
-        Eigen::Vector2d electrodePositionToPosition(const Eigen::Vector2i &electrode_position) {
-            if (electrode_position(0) >= electrodes_row || electrode_position(0) < 0 ||
-                electrode_position(1) >= electrodes_column || electrode_position(1) < 0)
-                return {-1.0, -1.0};
-            return {column_space * electrode_position(1), column_space * electrode_position(0)};
-        }
-
-        std::vector<Eigen::Vector2i> getNearElectrodes(const Eigen::Vector2d &pt) {
-            std::cout << column_space;
-            int f0 = std::floor(pt(0) / column_space);
-            int c0 = std::ceil(pt(0) / column_space);
-            int f1 = std::floor(pt(1) / column_space);
-            int c1 = std::ceil(pt(1) / column_space);
+        static std::vector<Eigen::Vector2i> getNearElectrodes(const Eigen::Vector2d &pt) {
+            //std::cout << column_space;
+            int f0 = std::floor(pt(0) / electrodes_space);
+            int c0 = std::ceil(pt(0) / electrodes_space);
+            int f1 = std::floor(pt(1) / electrodes_space);
+            int c1 = std::ceil(pt(1) / electrodes_space);
             std::vector<Eigen::Vector2i> v = {
                     {f1, f0},
                     {c1, f0},
                     {f1, c0},
                     {c1, c0}
-                    //{1,1},{1,1}
             };
             std::sort(v.begin(), v.end(), [](const Eigen::Vector2i &p1, const Eigen::Vector2i &p2) {
                 return p1(0) == p2(0) ? p1(1) > p2(1) : p1(0) > p2(0);
             });
             v.erase(unique(v.begin(), v.end()), v.end());
             v.erase(std::remove_if(v.begin(), v.end(), [&](const Eigen::Vector2i &position) {
-                return (electrodePositionToPosition(position) - pt).norm() > column_space * std::sqrt(2.0) / 2;
+                return (electrodePositionToPosition(position) - pt).norm() > electrodes_space * std::sqrt(2.0) / 2;
             }), v.end());
             return v;
         }
@@ -243,22 +194,17 @@ namespace acsr {
         /***
         * read config file, this function should be called after create an instance
         */
-        void readFile(std::string file_name) {
+        static void readFile(std::string file_name) {
             po::options_description opt_desc("Options");
             opt_desc.add_options()
-                    //("nanowire_count", po::value<int>()->default_value(3), "nanowire count")
-                    //("zeta_potential", po::value<std::string>()->default_value("1 1 1 1"), "zeta potential.")
-                    ("type", po::value<std::string>()->default_value("cc600"), "electrode system type")
-                    ("dimension", po::value<int>()->default_value(2), "electrode system dimension")
-                    ("height", po::value<double>()->default_value(180), "electrode system height")
-                    //("row_space", po::value<double>()->default_value(600), "row space.")
-                    //("column_space", po::value<double>()->default_value(600),"column space")
-                    ("electrodes_row", po::value<int>()->default_value(4), "electordes row")
-                    ("electrodes_column", po::value<int>()->default_value(4), "electrodes column")
-                    ("field_data_rows", po::value<int>()->default_value(181), "")
-                    ("field_data_cols", po::value<int>()->default_value(181), "")
-                    ("field_data_layers", po::value<int>()->default_value(181), "")
-                    ("data_file_name", po::value<std::string>(), "data file");
+                    ("type", po::value<std::string>(&NanowireConfig::type)->default_value("cc600"), "electrode system type")
+                    ("dimension", po::value<int>(&NanowireConfig::dimension)->default_value(2), "electrode system dimension")
+                    ("field_height", po::value<double>(&NanowireConfig::field_height)->default_value(720), "electrode system height")
+                    ("electrodes_row", po::value<int>(&NanowireConfig::electrodes_rows)->default_value(4), "electordes row")
+                    ("electrodes_column", po::value<int>(&NanowireConfig::electrodes_columns)->default_value(4), "electrodes column")
+                    ("field_data_rows", po::value<int>(&NanowireConfig::field_data_rows)->default_value(181), "")
+                    ("field_data_cols", po::value<int>(&NanowireConfig::field_data_cols)->default_value(181), "")
+                    ("field_data_layers", po::value<int>(&NanowireConfig::field_data_layers)->default_value(181), "");
 
             po::variables_map varmap;
 
@@ -268,90 +214,30 @@ namespace acsr {
             else {
                 po::store(po::parse_config_file(ifs, opt_desc), varmap);
                 po::notify(varmap);
-                std::cout<<"read nanowire config file completed\n";
+                std::cout<<"read nanowire config file done\n";
             }
-
-            /*
-            if (varmap.count("nanowire_count")) {
-                nanowire_count = varmap["nanowire_count"].as<int>();
-            } else {
-                std::cout << "Nanowire Config File Error\n";
-            }*/
-
-            if (varmap.count("dimension")) {
-                dimension = varmap["dimension"].as<int>();
-            } else {
-                std::cout << "Nanowire Config File Error\n";
+            if(type=="cc600"){
+                electrodes_space = 600e-6;
+            }else if(type == "cc60"){
+                electrodes_space = 60e-6;
             }
-
-            if (varmap.count("height")) {
-                height = varmap["height"].as<double>()*1e-6;
-            } else {
-                std::cout << "Nanowire Config File Error\n";
-            }
-
-
-            if (varmap.count("type")) {
-                type = varmap["type"].as<std::string>();
-                //row_space = std::stod(type.substr(2))*1e-6;
-                //column_space = std::stod(type.substr(2))*1e-6;
-                if (type == "cc60") {
-                    row_space = column_space = 60e-6;
-                    if(dimension==2)
-                        data_file_name = "E_Map_4by4_100V_CC60_E.txt";
-                    else if(dimension==3)
-                        data_file_name = "E_Map_4by4_100V_CC60_E_3D.txt";
-                } else if (type == "cc600") {
-                    row_space = column_space = 600e-6;
-                    if(dimension==2)
-                        data_file_name = "E_Map_4by4Mask1_100V_CC600reE.txt";
-                    else if(dimension==3)
-                        data_file_name = "E_Map_4by4_100V_CC600_E_3D_1mm.txt";
-
-                } else {
-                    std::cout << "no such config type\n";
-                }
-            } else {
-                std::cout << "Nanowire Config File Error\n";
-            }
-
-            if (varmap.count("electrodes_row")) {
-                electrodes_row = varmap["electrodes_row"].as<int>();
-            } else {
-                std::cout << "Nanowire Config File Error\n";
-            }
-
-            if (varmap.count("electrodes_column")) {
-                electrodes_column = varmap["electrodes_column"].as<int>();
-            } else {
-                std::cout << "Nanowire Config File Error\n";
-            }
-
-            if (varmap.count("field_data_rows")) {
-                field_data_rows = varmap["field_data_rows"].as<int>();
-            } else {
-                std::cout << "Nanowire Config File Error\n";
-            }
-
-            if (varmap.count("field_data_cols")) {
-                field_data_cols = varmap["field_data_cols"].as<int>();
-            } else {
-                std::cout << "Nanowire Config File Error\n";
-            }
-
-            if (varmap.count("field_data_layers")) {
-                field_data_layers = varmap["field_data_layers"].as<int>();
-            } else {
-                std::cout << "Nanowire Config File Error\n";
-            }
-            std::cout << "Read Nanowire Config File Finished.\n";
+            field_height*=1e-6;
         }
     };
+
+    std::string NanowireConfig::type;
+    int NanowireConfig::dimension;
+    double NanowireConfig::electrodes_space;///electrodes row space
+    double NanowireConfig::field_height;///electrodes column space
+    int NanowireConfig::electrodes_rows;///electrodes rows
+    int NanowireConfig::electrodes_columns;///electrodes columns
+    int NanowireConfig::field_data_rows;///the field data parameter
+    int NanowireConfig::field_data_cols;///the field data parameter
+    int NanowireConfig::field_data_layers;///the field data parameter
 
 
     class EpField {
     private:
-        std::shared_ptr<NanowireConfig> nanowire_config;
         float ***value;
         float ****value3d;
         float *x_axis;
@@ -372,10 +258,10 @@ namespace acsr {
          * @return
          */
         float interp2d(int page, float x, float y) {
-            int col = std::ceil((nanowire_config->getFieldDataCols() - 1) /
-                                ((nanowire_config->getElectrodesCols() - 1) * nanowire_config->getColumnSpace()) * x);
-            int row = std::ceil((nanowire_config->getFieldDataRows() - 1) /
-                                ((nanowire_config->getElectrodesRows() - 1) * nanowire_config->getRowSpace()) * y);
+            int col = std::ceil((NanowireConfig::field_data_cols - 1) /
+                                ((NanowireConfig::electrodes_columns - 1) * NanowireConfig::electrodes_space) * x);
+            int row = std::ceil((NanowireConfig::field_data_rows - 1) /
+                                ((NanowireConfig::electrodes_rows - 1) * NanowireConfig::electrodes_space) * y);
 
             if (row == 0 && col == 0) {
                 return value[page][0][0];
@@ -392,7 +278,7 @@ namespace acsr {
         }
 
         float interp3d(int page, float x, float y,float z) {
-            int l = std::ceil((nanowire_config->getFieldDataLayers() - 1) / nanowire_config->getHeight() * z);
+            int l = std::ceil((NanowireConfig::field_data_rows - 1) / NanowireConfig::field_height * z);
             if (l == 0) {
                 return interp2dWithHeight(page,x,y,0);
             }
@@ -403,10 +289,10 @@ namespace acsr {
         }
 
         float interp2dWithHeight(int page, float x, float y,int height) {
-            int col = std::ceil((nanowire_config->getFieldDataCols() - 1) /
-                                ((nanowire_config->getElectrodesCols() - 1) * nanowire_config->getColumnSpace()) * x);
-            int row = std::ceil((nanowire_config->getFieldDataRows() - 1) /
-                                ((nanowire_config->getElectrodesRows() - 1) * nanowire_config->getRowSpace()) * y);
+            int col = std::ceil((NanowireConfig::field_data_cols - 1) /
+                                ((NanowireConfig::electrodes_columns - 1) * NanowireConfig::electrodes_space) * x);
+            int row = std::ceil((NanowireConfig::field_data_rows - 1) /
+                                ((NanowireConfig::electrodes_rows - 1) * NanowireConfig::electrodes_space) * y);
             if (row == 0) {
                 return linearInterpolation(value3d[page][0][col - 1][height], value3d[page][0][col][height], x_axis[col - 1], x_axis[col], x);
             }
@@ -420,39 +306,38 @@ namespace acsr {
 
 
     public:
-        EpField() = delete;
 
         /***
          * constructor
          * @param config nanowire config pointer
          */
-        EpField(std::shared_ptr<NanowireConfig> config) : nanowire_config(config) {
+        EpField() {
             //read_file();
-            auto data_columns = nanowire_config->getFieldDataCols();
-            auto data_rows = nanowire_config->getFieldDataRows();
-            auto pages = nanowire_config->getElectrodesRows() * nanowire_config->getElectrodesCols();
+            auto data_columns = NanowireConfig::field_data_cols;
+            auto data_rows = NanowireConfig::field_data_rows;
+            auto pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
             x_axis = new float[data_columns];
             y_axis = new float[data_rows];
             for (int i = 0; i < data_columns; i++) {
-                x_axis[i] = float(i * (nanowire_config->getElectrodesCols() - 1) * nanowire_config->getColumnSpace() /
+                x_axis[i] = float(i * (NanowireConfig::electrodes_columns - 1) * NanowireConfig::electrodes_space /
                             (data_columns - 1));
             }
             for (int i = 0; i < data_rows; i++) {
-                y_axis[i] = float(i * (nanowire_config->getElectrodesRows() - 1) * nanowire_config->getRowSpace() /
+                y_axis[i] = float(i * (NanowireConfig::electrodes_rows - 1) * NanowireConfig::electrodes_space /
                             (data_rows - 1));
             }
-            if(nanowire_config->getDimension()==2){
+            if(NanowireConfig::dimension==2){
                 value = new float **[2 * pages];
                 for (int j = 0; j < 2 * pages; j++) {
                     value[j] = new float *[data_rows];
                     for (int i = 0; i < data_rows; ++i)
                         value[j][i] = new float [data_columns];
                 }
-            }else if(nanowire_config->getDimension()==3){
-                auto data_layers = nanowire_config->getFieldDataLayers();
+            }else if(NanowireConfig::dimension==3){
+                auto data_layers = NanowireConfig::field_data_layers;
                 z_axis = new float[data_layers];
                 for (int i = 0; i < data_layers; i++) {
-                    z_axis[i] = float(i * nanowire_config->getHeight() /(data_layers - 1));
+                    z_axis[i] = float(i * NanowireConfig::field_height /(data_layers - 1));
                 }
                 value3d=new float***[2*pages];
                 for(int p=0;p<2*pages;p++){
@@ -472,19 +357,19 @@ namespace acsr {
          * deconstructor
          */
         ~EpField() {
-            int pages = nanowire_config->getElectrodesRows() * nanowire_config->getElectrodesCols();
-            if(nanowire_config->getDimension()==2 && value != nullptr){
+            int pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
+            if(NanowireConfig::dimension==2 && value != nullptr){
                 for (int j = 0; j < 2 * pages; j++) {
-                    for (int i = 0; i < nanowire_config->getFieldDataRows(); ++i)
+                    for (int i = 0; i < NanowireConfig::field_data_rows; ++i)
                         delete[] value[j][i];
                     delete[] value[j];
                 }
             }
 
-            if(nanowire_config->getDimension()==3 && value3d != nullptr){
+            if(NanowireConfig::dimension==3 && value3d != nullptr){
                 for(int p=0;p<2*pages;p++){
-                    for (int i = 0; i < nanowire_config->getFieldDataRows(); ++i) {
-                        for (int j = 0; j < nanowire_config->getFieldDataCols(); ++j) {
+                    for (int i = 0; i < NanowireConfig::field_data_rows; ++i) {
+                        for (int j = 0; j < NanowireConfig::field_data_cols; ++j) {
                             delete[] value3d[p][i][j];
                         }
                         delete[] value3d[p][i];
@@ -503,14 +388,14 @@ namespace acsr {
          * @return
          */
         bool readFile() {
-            auto pages = nanowire_config->getElectrodesRows() * nanowire_config->getElectrodesCols();
+            auto pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
 
-            std::string file_str = "data/e_field/" + nanowire_config->getFieldDataFileName();
+            std::string file_str = "data/e_field/" + NanowireConfig::getFieldDataFileName();
             std::string binary_file_name = file_str.substr(0,file_str.length()-4)+".bin";
 
-            auto layers = nanowire_config->getFieldDataLayers();
-            auto rows = nanowire_config->getFieldDataRows();
-            auto columns = nanowire_config->getFieldDataCols();
+            auto layers = NanowireConfig::field_data_layers;
+            auto rows = NanowireConfig::field_data_rows;
+            auto columns = NanowireConfig::field_data_cols;
 
             ///if no binary file,read txt file and generate a binary file
             if (!boost::filesystem::exists(binary_file_name)) {
@@ -521,7 +406,7 @@ namespace acsr {
                 } else {
                     std::cout << "read file " << file_str << " done.\n";
                 }
-                if(nanowire_config->getDimension()==2) {
+                if(NanowireConfig::dimension==2) {
                     for (int i = 0; i < columns; i++) {
                         for (int j = 0; j < rows; j++) {
                             for (int k = 0; k < 2 * pages; k++)
@@ -536,7 +421,7 @@ namespace acsr {
                     }
                     fil.close();
                     return true;
-                }else if(nanowire_config->getDimension()==3){
+                }else if(NanowireConfig::dimension==3){
                     for(auto i=0;i<layers;i++){
                         for(auto j=0;j<columns;j++){
                             for(auto m=0;m<rows;m++)
@@ -565,7 +450,7 @@ namespace acsr {
                     return true;
                 }
             }else{ ///if exist binary file, read this file directly
-                if(nanowire_config->getDimension()==2){
+                if(NanowireConfig::dimension==2){
                     std::fstream fil;
                     fil.open(binary_file_name, std::ios::in | std::ios::binary);
                     if(fil.is_open()) {
@@ -576,7 +461,7 @@ namespace acsr {
                     }
                     fil.close();
 
-                }else if(nanowire_config->getDimension()==3){
+                }else if(NanowireConfig::dimension==3){
                     std::fstream fil;
                     fil.open(binary_file_name, std::ios::in | std::ios::binary);
                     if(fil.is_open()) {
@@ -601,17 +486,17 @@ namespace acsr {
          * @param wire_count
          */
         void getField(const Eigen::VectorXd &state, const Eigen::VectorXd &height, Eigen::MatrixXd &mat_E, int wire_count) {
-            auto pages = nanowire_config->getElectrodesRows() * nanowire_config->getElectrodesCols();
+            auto pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
             mat_E.resize(2 * wire_count, pages);
             double ex[2 * wire_count][pages];
-            if(nanowire_config->getDimension()==2) {
+            if(NanowireConfig::dimension==2) {
                 for (int k = 0; k < wire_count; ++k) {
                     for (int i = 0; i < pages; ++i) {
                         ex[2 * k][i] = double(interp2d(i, float(state(2*k)), float(state(2*k+1))));
                         ex[2 * k + 1][i] = double(interp2d(i + pages, float(state(2*k)), float(state(2*k+1))));
                     }
                 }
-            }else if(nanowire_config->getDimension()==3){
+            }else if(NanowireConfig::dimension==3){
                 for(int k=0;k<wire_count;++k){
                     for(int i=0;i<pages;++i){
                         ex[2*k][i]=double(interp3d(i,float(state(2*k)),float(state(2*k+1)),float(height(k))));
