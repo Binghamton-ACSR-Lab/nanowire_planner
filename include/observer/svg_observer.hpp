@@ -46,7 +46,7 @@ namespace acsr {
          * set dynamic system params
          * @param config nanowire dynamic system config
          */
-        void setNanowireConfig(int wire_count, const std::shared_ptr<NanowireConfig>& config){
+        void setNanowireConfig(int wire_count){
             _n_wire = wire_count;
             width = 600*(NanowireConfig::electrodes_columns-1) *zoom;
             height = 600*(NanowireConfig::electrodes_rows-1) *zoom;

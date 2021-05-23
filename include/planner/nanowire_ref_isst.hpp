@@ -23,8 +23,8 @@ namespace acsr{
         /***
          * setup
          */
-        void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) override {
-            SST::setup(nanowire_config);
+        void setup() override {
+            SST::setup();
             ///generating global reference path & storing it to "reference_path.txt"
             GlobalPath global_path;
             global_path.init(_dynamic_system->getRobotCount(),_init_state,_target_state);

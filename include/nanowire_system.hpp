@@ -72,6 +72,7 @@ namespace acsr {
         const double _wire_radius = 5e-6;
 
         double _step_length = 0.1;
+        int _field_dimension = 2;
 
         //std::shared_ptr<ReferencePath> reference_path;
 
@@ -82,8 +83,8 @@ namespace acsr {
      * constructor
      * @param nanowire_config a NanowireConfig pointer where store the config of the system
      */
-        NanowireSystem(int wire_count,const std::shared_ptr<NanowireConfig>& nanowire_config){
-            _field = std::make_shared<EpField>();
+        NanowireSystem(int wire_count, int field_dimension) : _field_dimension(field_dimension){
+            _field = std::make_shared<EpField>(_field_dimension);
             _field->readFile();
             _n_wire = wire_count;
 
@@ -113,7 +114,8 @@ namespace acsr {
 
         ~NanowireSystem() = default;
 
-        void setVarible(const Eigen::VectorXd& zeta, const Eigen::VectorXd& height){
+        void setParams(int field_dimension,const Eigen::VectorXd& zeta, const Eigen::VectorXd& height){
+            _field_dimension = field_dimension;
             setZetaPotential(zeta);
             setHeight(height);
             updateStepLength();
@@ -123,13 +125,6 @@ namespace acsr {
             state/=PlannerConfig::sst_delta_drain;
             return state.cast<int>();
         }
-
-
-
-        //void setHeight(const std::vector<double>& height){
-            //Eigen::Map<Eigen::VectorXd> zp(.data(), _nanowire_config->getNanowireCount());
-        //}
-
 
 
         double getStepSize(){
@@ -583,7 +578,7 @@ namespace acsr {
                 _step_length = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * PlannerConfig::integration_step;
             else if(NanowireConfig::type=="cc600")
                 _step_length = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * PlannerConfig::integration_step;
-            if(NanowireConfig::dimension==3) {
+            if(_field_dimension==3) {
                 auto x = _current_height.maxCoeff();
                 _step_length *= 10 * 2e-7 / (-7e-7 * std::log(x/1.02) - 5e-6);
             }

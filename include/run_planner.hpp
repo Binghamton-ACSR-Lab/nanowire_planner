@@ -35,8 +35,9 @@ namespace acsr {
             //read config files
             PlannerConfig::readFile("config/planner.cfg");
             SystemConfig::readFile("config/system.cfg");
-            nanowire_config = std::make_shared<NanowireConfig>();
-            nanowire_config->readFile("config/nanowire.cfg");
+            NanowireConfig::readFile("config/nanowire.cfg");
+
+
 
             //callback function for tcp server and http server, to parse string to command from clients
             auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
@@ -60,9 +61,8 @@ namespace acsr {
          *
          */
         void performanceTest(int wire_count) {
-            nanowire_config = std::make_shared<NanowireConfig>();
-            nanowire_config->readFile("config/nanowire.cfg");
-            nanowire_system = std::make_shared<NanowireSystem>(wire_count,nanowire_config);
+            NanowireConfig::readFile("config/nanowire.cfg");
+            nanowire_system = std::make_shared<NanowireSystem>(wire_count,_field_dimension);
 
             http_observer->reset();
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
@@ -73,14 +73,14 @@ namespace acsr {
             planner->setGoalRadius(PlannerConfig::goal_radius);
             //planner->setRandomSeed(time(NULL));
 
-            svg_observer->setNanowireConfig(wire_count,nanowire_config);
+            svg_observer->setNanowireConfig(wire_count);
 
             planner->registerSolutionUpdateObserver(svg_observer);
             planner->registerPlannerStartObserver(svg_observer);
             planner->registerSolutionUpdateObserver(http_observer);
             planner->registerPlannerStartObserver(http_observer);
             planner->registerNodeAddedObserver(svg_observer);
-            planner->setup(nanowire_config);
+            planner->setup();
             std::cout<<"Goal Radius: "<<PlannerConfig::goal_radius<<std::endl;
             std::thread forward_thread,reverse_thread,connecting_thread;
 
@@ -240,7 +240,6 @@ namespace acsr {
                     showMessage(msg);
                     return msg;
                 }
-                NanowireConfig::dimension = _field_dimension;
 
                 msg ="";
                 {
@@ -315,7 +314,7 @@ namespace acsr {
                     showMessage(msg);
                     return msg;
                 }
-                NanowireConfig::dimension = _field_dimension;
+
                 bool zeta_flag = true;
                 for (int i=0;i<2*_n_wires;i++) {
                     if(std::abs(temp_zeta[i]-zeta[i])>0.01){
@@ -489,18 +488,18 @@ namespace acsr {
             }
             http_observer->reset();
 
-            nanowire_system = std::make_shared<NanowireSystem>(_n_wires,nanowire_config);
+            nanowire_system = std::make_shared<NanowireSystem>(_n_wires,_field_dimension);
             nanowire_system->reset();
             Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),nanowire_system->getRobotCount());
             Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*nanowire_system->getRobotCount());
-            nanowire_system->setVarible(zeta_vec,height_vec);
+            nanowire_system->setParams(_field_dimension,zeta_vec,height_vec);
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
 
             planner->setStartState(Eigen::Map<Eigen::VectorXd>(_init_states.data(),2*_n_wires));
             planner->setTargetState(Eigen::Map<Eigen::VectorXd>(_target_states.data(),2*_n_wires));
             planner->setGoalRadius(PlannerConfig::goal_radius);
 
-            svg_observer->setNanowireConfig(_n_wires,nanowire_config);
+            svg_observer->setNanowireConfig(_n_wires);
             planner->registerSolutionUpdateObserver(svg_observer);
             planner->registerPlannerStartObserver(svg_observer);
             planner->registerSolutionUpdateObserver(http_observer);
@@ -509,7 +508,7 @@ namespace acsr {
 
             planner->registerSolutionUpdateObserver(tcp_server);
 
-            planner->setup(nanowire_config);
+            planner->setup();
             //std::cout<<"Goal Radius: "<<Config::goal_radius<<std::endl;
 
             std::thread forward_thread,reverse_thread,connecting_thread;
@@ -553,7 +552,7 @@ namespace acsr {
 
             Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),nanowire_system->getRobotCount());
             Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*nanowire_system->getRobotCount());
-            nanowire_system->setVarible(zeta_vec,height_vec);
+            nanowire_system->setParams(_field_dimension,zeta_vec,height_vec);
             nanowire_system->reset();
 
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
@@ -569,7 +568,7 @@ namespace acsr {
             planner->registerNodeAddedObserver(svg_observer);
             planner->registerSolutionUpdateObserver(tcp_server);
 
-            planner->setup(nanowire_config);
+            planner->setup();
             //std::cout<<"Goal Radius: "<<Config::goal_radius<<std::endl;
 
             std::thread forward_thread,reverse_thread,connecting_thread;
@@ -628,8 +627,6 @@ namespace acsr {
         //std::shared_ptr<BroadcastObserver> broad_observer;
         std::shared_ptr<HttpServer> http_observer;
         //std::shared_ptr<DatabaseObserver> db_observer;
-
-        std::shared_ptr<NanowireConfig> nanowire_config;
 
         int _n_wires;
         int _field_dimension;

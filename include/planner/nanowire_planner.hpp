@@ -105,7 +105,7 @@ namespace acsr {
         /***
          * necessary setups when starting a planner
          */
-        virtual void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) = 0;
+        virtual void setup() = 0;
 
         /***
          * one forward step. this function can be called in a while loop for a forward propagating process

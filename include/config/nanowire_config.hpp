@@ -64,7 +64,7 @@ namespace acsr {
     public:
 
         static std::string type;
-        static int dimension;
+        //static int dimension;
         static double electrodes_space;///electrodes row space
         static double field_height;///electrodes column space
         static int electrodes_rows;///electrodes rows
@@ -86,68 +86,20 @@ namespace acsr {
         NanowireConfig(const NanowireConfig &) = delete;
         NanowireConfig operator=(const NanowireConfig &) = delete;
 
-        /*
-        double getRowSpace() const {
-            return row_space;
-        }
-
-        std::string getType() const {
-            return type;
-        }
-
-        double getHeight() const {
-            return height;
-        }
-
-        int getDimension() const{
-            return dimension;
-        }
-
-        void setDimension(int dimention){
-            this->dimension = dimention;
-        }
-
-        double getColumnSpace() const {
-            return column_space;
-        }
-
-        int getElectrodesRows() const {
-            return electrodes_row;
-        }
-
-        int getElectrodesCols() const {
-            return electrodes_column;
-        }
-
-
-        int getFieldDataRows() const {
-            return field_data_rows;
-        }
-
-
-        int getFieldDataCols() const {
-            return field_data_cols;
-        }
-
-        int getFieldDataLayers() const{
-            return field_data_layers;
-        }
-        */
-
         /***
          * get field data file name
          * @return field data file name
          */
-        static std::string getFieldDataFileName() {
+        static std::string getFieldDataFileName(int field_dimension) {
             if (type == "cc60") {
-                if(dimension==2)
+                if(field_dimension==2)
                     return "E_Map_4by4_100V_CC60_E.txt";
-                else if(dimension==3)
+                else if(field_dimension==3)
                     return "E_Map_4by4_100V_CC60_E_3D.txt";
             } else if (type == "cc600") {
-                if(dimension==2)
+                if(field_dimension==2)
                     return "E_Map_4by4Mask1_100V_CC600reE.txt";
-                else if(dimension==3)
+                else if(field_dimension==3)
                     return "E_Map_4by4_100V_CC600_E_3D_1mm.txt";
             }
         }
@@ -198,7 +150,7 @@ namespace acsr {
             po::options_description opt_desc("Options");
             opt_desc.add_options()
                     ("type", po::value<std::string>(&NanowireConfig::type)->default_value("cc600"), "electrode system type")
-                    ("dimension", po::value<int>(&NanowireConfig::dimension)->default_value(2), "electrode system dimension")
+                    //("dimension", po::value<int>(&NanowireConfig::dimension)->default_value(2), "electrode system dimension")
                     ("field_height", po::value<double>(&NanowireConfig::field_height)->default_value(720), "electrode system height")
                     ("electrodes_row", po::value<int>(&NanowireConfig::electrodes_rows)->default_value(4), "electordes row")
                     ("electrodes_column", po::value<int>(&NanowireConfig::electrodes_columns)->default_value(4), "electrodes column")
@@ -226,7 +178,7 @@ namespace acsr {
     };
 
     std::string NanowireConfig::type;
-    int NanowireConfig::dimension;
+    //int NanowireConfig::dimension;
     double NanowireConfig::electrodes_space;///electrodes row space
     double NanowireConfig::field_height;///electrodes column space
     int NanowireConfig::electrodes_rows;///electrodes rows
@@ -243,6 +195,8 @@ namespace acsr {
         float *x_axis;
         float *y_axis;
         float *z_axis;
+
+        int _dimension;
 
     private:
 
@@ -311,7 +265,7 @@ namespace acsr {
          * constructor
          * @param config nanowire config pointer
          */
-        EpField() {
+        EpField(int dimension):_dimension(dimension) {
             //read_file();
             auto data_columns = NanowireConfig::field_data_cols;
             auto data_rows = NanowireConfig::field_data_rows;
@@ -326,14 +280,14 @@ namespace acsr {
                 y_axis[i] = float(i * (NanowireConfig::electrodes_rows - 1) * NanowireConfig::electrodes_space /
                             (data_rows - 1));
             }
-            if(NanowireConfig::dimension==2){
+            if(dimension==2){
                 value = new float **[2 * pages];
                 for (int j = 0; j < 2 * pages; j++) {
                     value[j] = new float *[data_rows];
                     for (int i = 0; i < data_rows; ++i)
                         value[j][i] = new float [data_columns];
                 }
-            }else if(NanowireConfig::dimension==3){
+            }else if(dimension==3){
                 auto data_layers = NanowireConfig::field_data_layers;
                 z_axis = new float[data_layers];
                 for (int i = 0; i < data_layers; i++) {
@@ -358,7 +312,7 @@ namespace acsr {
          */
         ~EpField() {
             int pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
-            if(NanowireConfig::dimension==2 && value != nullptr){
+            if(_dimension==2 && value != nullptr){
                 for (int j = 0; j < 2 * pages; j++) {
                     for (int i = 0; i < NanowireConfig::field_data_rows; ++i)
                         delete[] value[j][i];
@@ -366,7 +320,7 @@ namespace acsr {
                 }
             }
 
-            if(NanowireConfig::dimension==3 && value3d != nullptr){
+            if(_dimension==3 && value3d != nullptr){
                 for(int p=0;p<2*pages;p++){
                     for (int i = 0; i < NanowireConfig::field_data_rows; ++i) {
                         for (int j = 0; j < NanowireConfig::field_data_cols; ++j) {
@@ -390,7 +344,7 @@ namespace acsr {
         bool readFile() {
             auto pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
 
-            std::string file_str = "data/e_field/" + NanowireConfig::getFieldDataFileName();
+            std::string file_str = "data/e_field/" + NanowireConfig::getFieldDataFileName(_dimension);
             std::string binary_file_name = file_str.substr(0,file_str.length()-4)+".bin";
 
             auto layers = NanowireConfig::field_data_layers;
@@ -406,7 +360,7 @@ namespace acsr {
                 } else {
                     std::cout << "read file " << file_str << " done.\n";
                 }
-                if(NanowireConfig::dimension==2) {
+                if(_dimension==2) {
                     for (int i = 0; i < columns; i++) {
                         for (int j = 0; j < rows; j++) {
                             for (int k = 0; k < 2 * pages; k++)
@@ -421,7 +375,7 @@ namespace acsr {
                     }
                     fil.close();
                     return true;
-                }else if(NanowireConfig::dimension==3){
+                }else if(_dimension==3){
                     for(auto i=0;i<layers;i++){
                         for(auto j=0;j<columns;j++){
                             for(auto m=0;m<rows;m++)
@@ -450,7 +404,7 @@ namespace acsr {
                     return true;
                 }
             }else{ ///if exist binary file, read this file directly
-                if(NanowireConfig::dimension==2){
+                if(_dimension==2){
                     std::fstream fil;
                     fil.open(binary_file_name, std::ios::in | std::ios::binary);
                     if(fil.is_open()) {
@@ -461,7 +415,7 @@ namespace acsr {
                     }
                     fil.close();
 
-                }else if(NanowireConfig::dimension==3){
+                }else if(_dimension==3){
                     std::fstream fil;
                     fil.open(binary_file_name, std::ios::in | std::ios::binary);
                     if(fil.is_open()) {
@@ -489,14 +443,14 @@ namespace acsr {
             auto pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
             mat_E.resize(2 * wire_count, pages);
             double ex[2 * wire_count][pages];
-            if(NanowireConfig::dimension==2) {
+            if(_dimension==2) {
                 for (int k = 0; k < wire_count; ++k) {
                     for (int i = 0; i < pages; ++i) {
                         ex[2 * k][i] = double(interp2d(i, float(state(2*k)), float(state(2*k+1))));
                         ex[2 * k + 1][i] = double(interp2d(i + pages, float(state(2*k)), float(state(2*k+1))));
                     }
                 }
-            }else if(NanowireConfig::dimension==3){
+            }else if(_dimension==3){
                 for(int k=0;k<wire_count;++k){
                     for(int i=0;i<pages;++i){
                         ex[2*k][i]=double(interp3d(i,float(state(2*k)),float(state(2*k+1)),float(height(k))));

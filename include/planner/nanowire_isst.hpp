@@ -15,8 +15,8 @@ namespace acsr{
         /***
          * setup
          */
-        void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) override {
-            SST::setup(nanowire_config);
+        void setup() override {
+            SST::setup();
         }
 
         /***

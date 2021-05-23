@@ -473,7 +473,7 @@ namespace acsr{
         /***
          * override setup
          */
-        void setup(const std::shared_ptr<NanowireConfig>& nanowire_config) override{
+        void setup() override{
 
             _run_flag = true;
 
