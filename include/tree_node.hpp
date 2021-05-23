@@ -19,7 +19,7 @@ namespace acsr {
  */
     enum TreeId {
         forward = 0,
-        reverse,
+        backward,
         connection
     };
 

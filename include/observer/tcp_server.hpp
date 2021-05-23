@@ -145,7 +145,7 @@ namespace acsr {
             t.detach();
         }
 
-        void stop() {
+        void stopServer() {
             run_flag = false;
         }
 

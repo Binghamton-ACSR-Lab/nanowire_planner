@@ -130,16 +130,16 @@ namespace acsr{
         }
 
         /***
-         * reverse blossom
+         * backward blossom
          * @param parent the node to be explored
          * @param state store the temp state
          * @param control store the temp control
          * @param duration store temp duration
          * @return true if blossom process success
          */
-        bool reverseBlossom(const TreeNodePtr& parent,std::vector<PropagateParameters>& params){
+        bool backwardBlossom(const TreeNodePtr& parent,std::vector<PropagateParameters>& params){
 
-            if(parent->getTreeId()!=TreeId::reverse || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
+            if(parent->getTreeId()!=TreeId::backward || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
                 return false;
             bool return_value = false;
 
@@ -151,10 +151,10 @@ namespace acsr{
                 if(!_run_flag)return false;
                 auto temp_control = this->_dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
-                if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,
+                if (this->_dynamic_system->backwardPropagateBySteps(parent->getState(),temp_control,
                                                                    steps,temp_state,temp_duration)){
                     return_value = true;
-                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::reverse)] =
+                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::backward)] =
                             PropagateParameters {temp_state,temp_control,temp_duration};
                 }
             }
@@ -179,7 +179,7 @@ namespace acsr{
             Eigen::VectorXd reference_state;
             if(treeid==TreeId::forward)
                 reference_state= reference_path->getState(time);
-            else if(treeid==TreeId::reverse){
+            else if(treeid==TreeId::backward){
                 if(time<max_time)
                     reference_state = reference_path->getState(max_time-time);
                 else
@@ -229,7 +229,7 @@ namespace acsr{
 
         ~RefSST() override{
             this->forward_tree.clear();
-            this->reverse_tree.clear();
+            this->backward_tree.clear();
             optimize_set.clear();
         }
 
@@ -266,22 +266,22 @@ namespace acsr{
         }
 
         /***
-         * override reverse step
+         * override backward step
          */
-        void reverseStep() override{
+        void backwardStep() override{
             if(!this->_is_bi_tree_planner)
                 return;
             TreeNodePtr parent;
-            searchSelection(TreeId::reverse,parent);
+            searchSelection(TreeId::backward,parent);
             if(parent->getTreeNodeState()==TreeNodeState::not_in_tree)return;
 
             std::vector<PropagateParameters> params;
-            if (reverseBlossom(parent,params)){
+            if (backwardBlossom(parent,params)){
                 ///add parent to close map
                 if(parent==nullptr || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
                     return;
                 for(auto& param:params){
-                    auto new_node = addToTree(TreeId::reverse,parent,param.state,param.control,param.duration);
+                    auto new_node = addToTree(TreeId::backward,parent,param.state,param.control,param.duration);
                     if(PlannerConfig::show_node && new_node!= nullptr){
                         auto state = new_node->getState();
                         std::thread t([this,state](){
@@ -290,7 +290,7 @@ namespace acsr{
                                 s[2*i] = state[2*_dominant_index[i]];
                                 s[2*i+1] = state[2*_dominant_index[i]+1];
                             }
-                            notifyNodeAdded(state,TreeId::reverse);
+                            notifyNodeAdded(state,TreeId::backward);
                         });
                         t.detach();
 

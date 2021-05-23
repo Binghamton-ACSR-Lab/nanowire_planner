@@ -77,15 +77,15 @@ namespace acsr{
         }
 
         /***
-         * reverse blossom
+         * backward blossom
          * @param parent the node to be explored
          * @param state store the temp state
          * @param control store the temp control
          * @param duration store temp duration
          * @return true if blossom process success
          */
-        bool reverseBlossom(const SSTTreeNodePtr& parent,Eigen::VectorXd& state,Eigen::VectorXd& control,double& duration){
-            if(parent->getTreeId()!=TreeId::reverse || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
+        bool backwardBlossom(const SSTTreeNodePtr& parent,Eigen::VectorXd& state,Eigen::VectorXd& control,double& duration){
+            if(parent->getTreeId()!=TreeId::backward || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
                 return false;
             bool return_value = false;
             Eigen::VectorXd temp_state;
@@ -95,7 +95,7 @@ namespace acsr{
             for(int i=0;i<PlannerConfig::blossomM;i++) {
                 auto temp_control = this->_dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
-                if (this->_dynamic_system->reversePropagateBySteps(parent->getState(),temp_control,
+                if (this->_dynamic_system->backwardPropagateBySteps(parent->getState(),temp_control,
                                                                    steps,temp_state,temp_duration)){
 
                     if(this->_dynamic_system->getHeuristic(temp_state,this->_root->getState())<heuristic_value){
@@ -119,7 +119,7 @@ namespace acsr{
 
         ~iSST() override{
             this->forward_tree.clear();
-            this->reverse_tree.clear();
+            this->backward_tree.clear();
             this->optimize_set.clear();
         }
 
@@ -160,25 +160,25 @@ namespace acsr{
         }
 
         /***
-         * override reverse step
+         * override backward step
          */
-        void reverseStep() override{
+        void backwardStep() override{
             if(!this->_is_bi_tree_planner)
                 return;
             TreeNodePtr parent;
-            searchSelection(TreeId::reverse,parent);
+            searchSelection(TreeId::backward,parent);
             if(parent->getTreeNodeState()==TreeNodeState::not_in_tree)return;
 
             Eigen::VectorXd state;
             Eigen::VectorXd control;
             double duration;
             auto sst_parent = std::dynamic_pointer_cast<SSTTreeNode>(parent);
-            while (reverseBlossom(sst_parent,state,control,duration)){
-                auto new_node = this->addToTree(TreeId::reverse,sst_parent,state,control,duration);
+            while (backwardBlossom(sst_parent,state,control,duration)){
+                auto new_node = this->addToTree(TreeId::backward,sst_parent,state,control,duration);
                 this->checkConnection(new_node);
                 if(PlannerConfig::show_node && new_node!= nullptr){
                     std::thread t([this,state](){
-                        notifyNodeAdded(state,TreeId::reverse);
+                        notifyNodeAdded(state,TreeId::backward);
                     });
                     t.detach();
                 }

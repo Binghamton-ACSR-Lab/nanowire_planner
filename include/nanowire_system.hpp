@@ -244,7 +244,7 @@ namespace acsr {
      * @return
      */
         bool
-        reversePropagateBySteps(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control, //double step_length,
+        backwardPropagateBySteps(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control, //double step_length,
                                 int step, Eigen::VectorXd &result_state, double &duration){
             return forwardPropagateBySteps(init_state, control, step, result_state, duration);
         }
@@ -297,7 +297,7 @@ namespace acsr {
      * override DynamicSystem function
      * @return
      */
-        bool reversePropagateByDistance(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control,
+        bool backwardPropagateByDistance(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control,
                                         double max_distance, Eigen::VectorXd &result_state,
                                         double &duration) {
             return forwardPropagateByDistance(init_state, control,max_distance, result_state, duration);

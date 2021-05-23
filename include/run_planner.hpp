@@ -37,8 +37,6 @@ namespace acsr {
             SystemConfig::readFile("config/system.cfg");
             NanowireConfig::readFile("config/nanowire.cfg");
 
-
-
             //callback function for tcp server and http server, to parse string to command from clients
             auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
 
@@ -58,12 +56,11 @@ namespace acsr {
         }
 
         /***
-         *
+         * performance test
+         * @param wire_count nanowire count
          */
         void performanceTest(int wire_count) {
-            NanowireConfig::readFile("config/nanowire.cfg");
             nanowire_system = std::make_shared<NanowireSystem>(wire_count,_field_dimension);
-
             http_observer->reset();
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
 
@@ -86,39 +83,28 @@ namespace acsr {
 
             ///forward step threadcc
             forward_run_flag = true;
-            //forward_stopped_flag = false;
             forward_thread = std::thread(&RunPlanner::forwardExplore,this);
-            //thread_vector.push_back(std::move(forward_thread));
 
             ///reverse step thread
-
             if(PlannerConfig::bidirection){
                 reverse_run_flag = true;
-                //reverse_stopped_flag = false;
                 planner->setBiTreePlanner(true);
                 reverse_thread = std::thread(&RunPlanner::reverseExplore,this);
-
-                //reverse_thread.join();
-                //thread_vector.push_back(std::move(reverse_thread));
             }
 
             ///connecting thread
             if(PlannerConfig::optimization){
                 optimize_run_flag = true;
-                //optimize_stopped_flag = false;
                 planner->setOptimizedConnect(true);
                 connecting_thread = std::thread(&RunPlanner::connecting,this);
-                //thread_vector.push_back(std::move(connecting_thread));
             }
 
             auto start = std::chrono::steady_clock::now();
 
             VariablesGrid vg;
             vg.read("reference_path.txt");
-            //is_running = true;
             planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner),"img",vg);
             while(!exit_flag){
-
                 std::cout<<"planner is running\n Number of Node: ";
                 auto nodes_count = planner->getNumberOfNode();
                 std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
@@ -152,14 +138,13 @@ namespace acsr {
                     connecting_thread.join();
             }
             std::cout<<"Planner Finished\n";
-
         }
 
         /***
          * start and linsten command from server
          */
         void run(){
-            ///waiting unitil receiving exit command
+            ///waiting until receiving exit command
             while(!exit_flag){
                 if(!run_flag) {
                     showMessage("waiting command");
@@ -167,8 +152,13 @@ namespace acsr {
                     std::cout<<"planner is running\n Number of Node: ";
                     auto nodes_count = planner->getNumberOfNode();
                     std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
-                    std::cout<<"Solution Quality: "<<planner->getMaxCost()<<'\n';
+                    if(planner->getMaxCost()>1e6){
+                        std::cout<<"no solution\n";
+                    }else {
+                        std::cout << "Solution Quality: " << planner->getMaxCost() << '\n';
+                    }
                     std::cout.flush();
+                    ///to update svg for node, this image can be view via http
                     svg_observer->update();
                 }
                 std::this_thread::sleep_for (std::chrono::seconds(5));
@@ -339,8 +329,6 @@ namespace acsr {
                     }
                 }
 
-
-
                 if(zeta_flag & init_flag & height_flag){
                     msg = "reset parameters keeps the same! Ignored\n";
                     showMessage("reset parameters keeps the same! Ignored");
@@ -372,36 +360,13 @@ namespace acsr {
                 }
 
                 stop();
+                ///wait until all threads terminated
                 while(!forward_stopped_flag);
                 while(!reverse_stopped_flag);
                 while(!optimize_stopped_flag);
                 std::thread t(&RunPlanner::resetPlanner,this);
                 t.detach();
                 return msg;
-
-
-                if(zeta_flag){
-                    stop();
-                    _init_states = temp_init_states;
-                    zeta = temp_zeta;
-                    while(!forward_stopped_flag);
-                    while(!reverse_stopped_flag);
-                    while(!optimize_stopped_flag);
-                    std::thread t(&RunPlanner::startNewPlanner,this);
-                    t.detach();
-                    return msg;
-                }else{
-                    stop();
-                    while(!forward_stopped_flag);
-                    while(!reverse_stopped_flag);
-                    while(!optimize_stopped_flag);
-                    std::thread t(&RunPlanner::startNewPlanner,this);
-                    t.detach();
-                    return msg;
-                }
-                //run_flag=true;
-                //is_running = true;
-                //startNewPlanner();
             }else if(strs[0]=="STOP"){
                 stop();
                 return "planner stopped";
@@ -416,14 +381,14 @@ namespace acsr {
         }
 
         ~RunPlanner(){
-            //broad_observer->stopServer();
+            tcp_server->stopServer();
             http_observer->stopServer();
         }
 
     private:
         /***
-     * forward explore
-     */
+         * forward explore thread
+         */
         void forwardExplore(){
             while(!forward_stopped_flag){
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -437,21 +402,21 @@ namespace acsr {
         }
 
         /***
-         * reverse explore
+         * reverse explore thread
          */
         void reverseExplore(){
             while(!reverse_stopped_flag){
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             while(reverse_run_flag){
-                planner->reverseStep();
+                planner->backwardStep();
                 reverse_stopped_flag = false;
             }
             reverse_stopped_flag = true;
         }
 
         /***
-         * connect process
+         * connect process thread
          */
         void connecting(){
             if(!planner)return;
@@ -465,39 +430,51 @@ namespace acsr {
             optimize_stopped_flag = true;
         }
 
+        /***
+         * notify all planning thread to stop
+         */
         void stop(){
             if(planner)planner->stop();
             run_flag = false;
-            //is_running = false;
             optimize_run_flag = false;
             forward_run_flag = false;
             reverse_run_flag = false;
         }
 
+        /***
+         * notify program to exit
+         */
         void exit(){
             stop();
             exit_flag = true;
         }
 
-
+        /***
+         * start a new planner
+         */
         void startNewPlanner(){
             if(planner && run_flag){
                 std::cout<<"waiting planner to reset!\n";
                 showMessage("waiting planner to reset!");
                 planner->stop();
             }
+            ///reset information on http server.
             http_observer->reset();
 
+            ///create a new nanowire system
             nanowire_system = std::make_shared<NanowireSystem>(_n_wires,_field_dimension);
-            nanowire_system->reset();
-            Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),nanowire_system->getRobotCount());
-            Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*nanowire_system->getRobotCount());
+            ///set parameters for nanowire system
+            Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),_n_wires);
+            Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*_n_wires);
             nanowire_system->setParams(_field_dimension,zeta_vec,height_vec);
-            planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
+            nanowire_system->reset();
 
+            ///create a new planner
+            planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
             planner->setStartState(Eigen::Map<Eigen::VectorXd>(_init_states.data(),2*_n_wires));
             planner->setTargetState(Eigen::Map<Eigen::VectorXd>(_target_states.data(),2*_n_wires));
             planner->setGoalRadius(PlannerConfig::goal_radius);
+
 
             svg_observer->setNanowireConfig(_n_wires);
             planner->registerSolutionUpdateObserver(svg_observer);
@@ -505,7 +482,6 @@ namespace acsr {
             planner->registerSolutionUpdateObserver(http_observer);
             planner->registerPlannerStartObserver(http_observer);
             planner->registerNodeAddedObserver(svg_observer);
-
             planner->registerSolutionUpdateObserver(tcp_server);
 
             planner->setup();
@@ -537,6 +513,9 @@ namespace acsr {
 
         }
 
+        /***
+         * reset planner, keep nanowire system, create new planner
+         */
         void resetPlanner(){
             if(planner && run_flag){
                 std::cout<<"waiting planner to reset!\n";
@@ -544,23 +523,20 @@ namespace acsr {
                 planner->stop();
             }
             http_observer->reset();
-            //nanowire_config->readFile("config/nanowire.cfg");
-            //nanowire_config->setNanowireCount(_n_wires);
-            //nanowire_config->setZeta(zeta);
-            //Config::readFile("config/planner.cfg");
-            //nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
 
-            Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),nanowire_system->getRobotCount());
-            Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*nanowire_system->getRobotCount());
+            ///reset nanowire parameters
+            Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),_n_wires);
+            Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*_n_wires);
             nanowire_system->setParams(_field_dimension,zeta_vec,height_vec);
             nanowire_system->reset();
 
+            ///create new planner
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
             planner->setStartState(Eigen::Map<Eigen::VectorXd>(_init_states.data(),2*_n_wires));
             planner->setTargetState(Eigen::Map<Eigen::VectorXd>(_target_states.data(),2*_n_wires));
             planner->setGoalRadius(PlannerConfig::goal_radius);
 
-            //svg_observer->setNanowireConfig(nanowire_config);
+            ///register observers
             planner->registerSolutionUpdateObserver(svg_observer);
             planner->registerPlannerStartObserver(svg_observer);
             planner->registerSolutionUpdateObserver(http_observer);
@@ -569,31 +545,30 @@ namespace acsr {
             planner->registerSolutionUpdateObserver(tcp_server);
 
             planner->setup();
-            //std::cout<<"Goal Radius: "<<Config::goal_radius<<std::endl;
 
             std::thread forward_thread,reverse_thread,connecting_thread;
-
-            ///forward step threadcc
+            ///forward step thread
             forward_run_flag = true;
             forward_thread = std::thread(&RunPlanner::forwardExplore,this);
             forward_thread.detach();
+            ///reverse thread
             if(PlannerConfig::bidirection){
                 reverse_run_flag = true;
                 planner->setBiTreePlanner(true);
                 reverse_thread = std::thread(&RunPlanner::reverseExplore,this);
                 reverse_thread.detach();
             }
-
+            ///connect thread
             if(PlannerConfig::optimization){
                 optimize_run_flag = true;
                 planner->setOptimizedConnect(true);
                 connecting_thread = std::thread(&RunPlanner::connecting,this);
                 connecting_thread.detach();
             }
+            run_flag = true;
 
             VariablesGrid vg;
             vg.read("reference_path.txt");
-            run_flag = true;
             planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner),"img",vg);
         }
 
@@ -614,17 +589,10 @@ namespace acsr {
         std::atomic_bool forward_stopped_flag{true};
         std::atomic_bool reverse_stopped_flag{true};
         std::atomic_bool optimize_stopped_flag{true};
-
-        ///
         std::atomic<bool> exit_flag{false};
 
-        //std::atomic<bool> notify_flag{false};
-        //std::atomic<bool> notify_stopped_flag{true};
-
-        //std::atomic_bool is_running;
         ///observers
         std::shared_ptr<SvgObserver> svg_observer;
-        //std::shared_ptr<BroadcastObserver> broad_observer;
         std::shared_ptr<HttpServer> http_observer;
         //std::shared_ptr<DatabaseObserver> db_observer;
 
@@ -647,7 +615,6 @@ namespace acsr {
             for(auto& d:message_displayers)
                 d->displayMessage(msg);
         }
-
     };
 
 }

@@ -9,6 +9,9 @@
 #include <unordered_map>
 namespace acsr{
 
+    /***
+     * hash function for key = IVector
+     */
     struct GridHash
     {
         std::size_t operator()(const IVector & k) const
@@ -49,8 +52,8 @@ namespace acsr{
          * @param duration
          * @return
          */
-        virtual bool reversePropagate(const Eigen::VectorXd& init_state, const Eigen::VectorXd& control, int steps,Eigen::VectorXd& result_state,double& duration){
-            return this->_dynamic_system->reversePropagateBySteps(init_state,control,steps,result_state,duration);
+        virtual bool backwardPropagate(const Eigen::VectorXd& init_state, const Eigen::VectorXd& control, int steps,Eigen::VectorXd& result_state,double& duration){
+            return this->_dynamic_system->backwardPropagateBySteps(init_state,control,steps,result_state,duration);
         }
 
         /***
@@ -67,17 +70,11 @@ namespace acsr{
                                      const Eigen::VectorXd& control,
                                      double duration){
             auto target_node = tree_id==TreeId::forward?_goal:_root;
-
             if(getMaxCost() <= parent->getCost() + duration + _dynamic_system->getHeuristic(state,target_node->getState()))
                 return nullptr;
 
-            /*
-            auto witness_sample = this->checkWitness(state,tree_id);
 
-            if(witness_sample->getMonitorNode()
-               && witness_sample->getMonitorNode()->getCost() < parent->getCost() + duration)
-                return nullptr;*/
-            auto& map = tree_id==TreeId::forward?forward_prox_map:reverse_prox_map;
+            auto& map = tree_id==TreeId::forward?forward_prox_map:backward_prox_map;
             auto iv = _dynamic_system->getGrid(state);
             SSTTreeNodePtr previous_node = nullptr;
             if(map.find(iv)!=map.end())
@@ -125,7 +122,7 @@ namespace acsr{
 
         void checkConnection(TreeNodePtr node){
             if(node == nullptr)return;
-            TreeId another_treeid = (node->getTreeId()==TreeId::forward?TreeId::reverse:TreeId::forward);
+            TreeId another_treeid = (node->getTreeId()==TreeId::forward?TreeId::backward:TreeId::forward);
             ///check solution update
             auto nearest_vec_node = getNearNodeByRadiusAndNearest(node->getState(),another_treeid,PlannerConfig::optimization_distance);
 
@@ -200,9 +197,9 @@ namespace acsr{
                 node->setTreeNodeState(TreeNodeState::in_tree);
                 this->_number_of_nodes.first+=1;
             }
-            else if(node->getTreeId()==TreeId::reverse){
-                std::scoped_lock<std::mutex> lock1(reverse_tree_mutex);
-                reverse_tree.insert({node->getState(),node});
+            else if(node->getTreeId()==TreeId::backward){
+                std::scoped_lock<std::mutex> lock1(backward_tree_mutex);
+                backward_tree.insert({node->getState(),node});
                 node->setTreeNodeState(TreeNodeState::in_tree);
                 this->_number_of_nodes.second+=1;
             }
@@ -223,10 +220,10 @@ namespace acsr{
                     this->_number_of_nodes.first -= 1;
                 }
             }
-            else if(node->getTreeId()==TreeId::reverse){
-                std::scoped_lock<std::mutex> lock1(reverse_tree_mutex);
-                if(reverse_tree.find(node->getState())!=reverse_tree.end()) {
-                    reverse_tree.erase(node->getState());
+            else if(node->getTreeId()==TreeId::backward){
+                std::scoped_lock<std::mutex> lock1(backward_tree_mutex);
+                if(backward_tree.find(node->getState())!=backward_tree.end()) {
+                    backward_tree.erase(node->getState());
                     this->_number_of_nodes.second -= 1;
                 }
             }
@@ -243,9 +240,9 @@ namespace acsr{
                 std::scoped_lock<std::mutex> lock1(forward_prox_tree_mutex);
                 forward_prox_container.insert({node->getState(),node});
             }
-            else if(tree_id==TreeId::reverse){
-                std::scoped_lock<std::mutex> lock1(reverse_prox_tree_mutex);
-                reverse_prox_container.insert({node->getState(),node});
+            else if(tree_id==TreeId::backward){
+                std::scoped_lock<std::mutex> lock1(backward_prox_tree_mutex);
+                backward_prox_container.insert({node->getState(),node});
             }
         }*/
 
@@ -276,9 +273,9 @@ namespace acsr{
             if(tree_id == TreeId::forward){
                 std::unique_lock<std::mutex> lock(forward_tree_mutex);
                 temp_vec =  _dynamic_system->getNearNodeByCount(state,forward_tree,count);
-            }else if(tree_id == TreeId::reverse){
-                std::unique_lock<std::mutex> lock(reverse_tree_mutex);
-                temp_vec = _dynamic_system->getNearNodeByCount(state,reverse_tree,count);
+            }else if(tree_id == TreeId::backward){
+                std::unique_lock<std::mutex> lock(backward_tree_mutex);
+                temp_vec = _dynamic_system->getNearNodeByCount(state,backward_tree,count);
             }
             return temp_vec;
         }
@@ -296,9 +293,9 @@ namespace acsr{
             if(tree_id == TreeId::forward){
                 std::unique_lock<std::mutex> lock(forward_tree_mutex);
                 temp_node_vec = this->_dynamic_system->getNearNodeByRadiusAndNearest(state,forward_tree,radius);
-            }else if(tree_id == TreeId::reverse){
-                std::unique_lock<std::mutex> lock(reverse_tree_mutex);
-                temp_node_vec = this->_dynamic_system->getNearNodeByRadiusAndNearest(state,reverse_tree,radius);
+            }else if(tree_id == TreeId::backward){
+                std::unique_lock<std::mutex> lock(backward_tree_mutex);
+                temp_node_vec = this->_dynamic_system->getNearNodeByRadiusAndNearest(state,backward_tree,radius);
             }
             return temp_node_vec;
         }
@@ -312,7 +309,7 @@ namespace acsr{
         virtual double chooseOtherNearestForOptimization(TreeNodePtr node,TreeNodePtr & pair_node){
             double min_value=-1.0;
             if(node== nullptr )return -1;
-            TreeId other_tree_id = node->getTreeId()==TreeId::reverse?TreeId::forward:TreeId::reverse;
+            TreeId other_tree_id = node->getTreeId()==TreeId::backward?TreeId::forward:TreeId::backward;
             auto nearest = getNearNodeByRadiusAndNearest(node->getState(),other_tree_id,PlannerConfig::optimization_distance);
             if(nearest.first.empty()){
                 pair_node = nullptr;
@@ -387,43 +384,12 @@ namespace acsr{
 
         }
 
-        /***
-         * find a witness node for a state, if not exist, create one without monitoring node
-         * @param state
-         * @param treeId
-         * @return
-         */
-         /*
-        virtual ProxNodePtr checkWitness(const Eigen::VectorXd& state,TreeId treeId){
-            //auto iv = _dynamic_system->getGrid(state);
-
-
-            std::vector<NodePtr> nearest_vect;
-            if(treeId == TreeId::forward){
-                nearest_vect = this->_dynamic_system->getNearNodeByCount(state,forward_prox_container,1);
-            }else if(treeId == TreeId::reverse){
-                nearest_vect = this->_dynamic_system->getNearNodeByCount(state,reverse_prox_container,1);
-            }
-
-            auto distance = this->_dynamic_system->distance(state,nearest_vect.front()->getState());
-            if(distance < Config::sst_delta_drain)
-                return std::static_pointer_cast<ProxNode>(nearest_vect.front());
-
-            auto new_prox = std::make_shared<ProxNode>(state);
-            addProxToContainer(new_prox,treeId);
-            return new_prox;
-        }*/
-
-
-
-
-
-
-
     protected:
 
         KdTreeType forward_tree;
-        KdTreeType reverse_tree;
+        KdTreeType backward_tree;
+        std::mutex forward_tree_mutex;
+        std::mutex backward_tree_mutex;
 
         std::mutex optimize_set_mutex;
         std::map<double,std::pair<std::weak_ptr<TreeNode>,std::weak_ptr<TreeNode>>> optimize_set;
@@ -431,17 +397,8 @@ namespace acsr{
         SSTTreeNodePtr _root;
         SSTTreeNodePtr _goal;
 
-        //KdTreeType forward_prox_container;
-        //KdTreeType reverse_prox_container;
-
-        std::unordered_map<IVector,std::weak_ptr<SSTTreeNode>,GridHash> forward_prox_map;
-        std::unordered_map<IVector,std::weak_ptr<SSTTreeNode>,GridHash> reverse_prox_map;
-
-        std::mutex forward_tree_mutex;
-        std::mutex reverse_tree_mutex;
-
-        //std::mutex forward_prox_tree_mutex;
-        //std::mutex reverse_prox_tree_mutex;
+        std::unordered_map<IVector,std::weak_ptr<SSTTreeNode>,GridHash> forward_prox_map; ///map storing forward active node but in weak_ptr
+        std::unordered_map<IVector,std::weak_ptr<SSTTreeNode>,GridHash> backward_prox_map; ///map storing backword active node but in weak_ptr
 
 
     public:
@@ -454,7 +411,7 @@ namespace acsr{
         SST(const std::shared_ptr<NanowireSystem>& dynamic_system):
             Planner(dynamic_system),
             forward_tree(this->_dynamic_system->getStateDimension()),
-            reverse_tree(this->_dynamic_system->getStateDimension()){
+            backward_tree(this->_dynamic_system->getStateDimension()){
 
         }
 
@@ -463,9 +420,9 @@ namespace acsr{
          */
         ~SST() override{
             //forward_prox_container.clear();
-            //reverse_prox_container.clear();
+            //backward_prox_container.clear();
             forward_tree.clear();
-            reverse_tree.clear();
+            backward_tree.clear();
             optimize_set.clear();
             //optimize_set[1].clear();
         }
@@ -493,7 +450,7 @@ namespace acsr{
             _root = std::make_shared<SSTTreeNode>(TreeId::forward, this->_init_state);
             _root->setEdge(TreeEdge(Eigen::VectorXd(this->_dynamic_system->getControlDimension()),0.0));
             addPointToContainer(_root);
-            _goal = std::make_shared<SSTTreeNode>(TreeId::reverse, this->_target_state);
+            _goal = std::make_shared<SSTTreeNode>(TreeId::backward, this->_target_state);
             _goal->setEdge(TreeEdge(Eigen::VectorXd(this->_dynamic_system->getControlDimension()),0.0));
             addPointToContainer(_goal);
 
@@ -510,9 +467,9 @@ namespace acsr{
             //auto goal_prox = std::make_shared<ProxNode>(this->_target_state);
             //_goal->setProxNode(goal_prox);
             _goal->setActive(true);
-            //addProxToContainer(goal_prox,TreeId::reverse);
+            //addProxToContainer(goal_prox,TreeId::backward);
             //goal_prox->setMonitorNode(_goal);
-            reverse_prox_map[_dynamic_system->getGrid(_target_state)]= _goal;
+            backward_prox_map[_dynamic_system->getGrid(_target_state)]= _goal;
 
 
             ///notify observer
@@ -558,14 +515,14 @@ namespace acsr{
         }
 
         /***
-         * override reverse step
+         * override backward step
          */
-        void reverseStep() override{
+        void backwardStep() override{
             if(!this->_is_bi_tree_planner)
                 return;
             auto temp_state = this->_dynamic_system->randomState();
             auto temp_control = this->_dynamic_system->randomControl();
-            auto nearest_vec_node = getNearNodeByRadiusAndNearest(temp_state,TreeId::reverse,PlannerConfig::sst_delta_near);
+            auto nearest_vec_node = getNearNodeByRadiusAndNearest(temp_state,TreeId::backward,PlannerConfig::sst_delta_near);
             //auto parent = std::static_pointer_cast<SSTTreeNode>(nearest_vec_node.second);
             auto parent = nearest_vec_node.second;
             if(!nearest_vec_node.first.empty()) {
@@ -589,8 +546,8 @@ namespace acsr{
             auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
             Eigen::VectorXd result;
             double duration;
-            if(reversePropagate(parent->getState(),temp_control,steps,result,duration)){
-                auto new_node = addToTree(TreeId::reverse,std::static_pointer_cast<TreeNode>(parent),result,temp_control,duration);
+            if(backwardPropagate(parent->getState(),temp_control,steps,result,duration)){
+                auto new_node = addToTree(TreeId::backward,std::static_pointer_cast<TreeNode>(parent),result,temp_control,duration);
                 checkConnection(new_node);
             }
         }
@@ -609,14 +566,8 @@ namespace acsr{
             TreeNodePtr temp_explore_node = nullptr;
             TreeNodePtr target = nullptr;
             TreeNodePtr temp_target = nullptr;
-            //mutex_for_set.lock();
-            //auto index = randomInteger(0,1);
-            //if(this->optimize_set[index].empty())
-             //   index = 1-index;
 
-            //double total_cost = std::numeric_limits<double>::max();
             auto it = this->optimize_set.begin();
-            //auto weak_explore_it = it;
             while(it!=this->optimize_set.end()){
                 if(!_run_flag)return;
 

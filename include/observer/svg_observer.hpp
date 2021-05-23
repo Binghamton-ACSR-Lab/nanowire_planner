@@ -247,7 +247,7 @@ namespace acsr {
                     Circle circle(convertStateToImagePoint(state, i),2, Fill(colors[i]));
                     original_image<<circle;
                 }
-            }else if(id==TreeId::reverse){
+            }else if(id==TreeId::backward){
                 for(auto i=0;i<state.size()/2;++i) {
                     Circle circle(convertStateToImagePoint(state, i),2, Fill(*(colors.rbegin()+i)));
                     original_image<<circle;

@@ -79,7 +79,7 @@ namespace acsr {
                     if (it == node)return true;
                     it = it->getParent();
                 }
-            } else if (node->getTreeId() == TreeId::reverse) {
+            } else if (node->getTreeId() == TreeId::backward) {
                 auto it = _best_goal.second;
                 while (it) {
                     if (it == node)return true;
@@ -113,9 +113,9 @@ namespace acsr {
         virtual void forwardStep() = 0;
 
         /***
-         * one reverse step. this function can be called in a while loop for a reverse propagating process
+         * one backward step. this function can be called in a while loop for a backward propagating process
          */
-        virtual void reverseStep() = 0;
+        virtual void backwardStep() = 0;
 
         /***
          * one connecting step. this function can be called in a while loop for a connecting process
@@ -124,7 +124,7 @@ namespace acsr {
 
         /***
          * get the current numbers of nodes
-         * @return a pair of nodes on forward tree and nodes on reverse tree
+         * @return a pair of nodes on forward tree and nodes on backward tree
          */
         virtual std::pair<unsigned long, unsigned long> getNumberOfNode() {
             return _number_of_nodes;
@@ -176,7 +176,7 @@ namespace acsr {
         }
 
         /***
-         * check whether the planner is bi-directional explore, e.g.the reverse propagating process is employed
+         * check whether the planner is bi-directional explore, e.g.the backward propagating process is employed
          * @return
          */
         virtual bool isBiTreePlanner() const {
@@ -184,7 +184,7 @@ namespace acsr {
         }
 
         /***
-         * set whether the planner is bi-directional explore, e.g.the reverse propagating process is employed
+         * set whether the planner is bi-directional explore, e.g.the backward propagating process is employed
          */
         virtual void setBiTreePlanner(bool bi_tree_planner) {
             _is_bi_tree_planner = bi_tree_planner;
@@ -268,33 +268,33 @@ namespace acsr {
         /***
          * get the solution data for solution update observers.
          * @param forward_states
-         * @param reverse_states
+         * @param backward_states
          * @param connect_states
          * @param forward_control
-         * @param reverse_control
+         * @param backward_control
          * @param connect_control
          * @param forward_durations
-         * @param reverse_durations
+         * @param backward_durations
          * @param connect_durations
          */
         void getSolutionVectors(std::vector<Eigen::VectorXd> &forward_states,
-                                std::vector<Eigen::VectorXd> &reverse_states,
+                                std::vector<Eigen::VectorXd> &backward_states,
                                 std::vector<Eigen::VectorXd> &connect_states,
                                 std::vector<Eigen::VectorXd> &forward_control,
-                                std::vector<Eigen::VectorXd> &reverse_control,
+                                std::vector<Eigen::VectorXd> &backward_control,
                                 std::vector<Eigen::VectorXd> &connect_control,
                                 std::vector<double> &forward_durations,
-                                std::vector<double> &reverse_durations,
+                                std::vector<double> &backward_durations,
                                 std::vector<double> &connect_durations,
                                 std::string& solution_string) {
             forward_states.clear();
-            reverse_states.clear();
+            backward_states.clear();
             connect_states.clear();
             forward_control.clear();
-            reverse_control.clear();
+            backward_control.clear();
             connect_control.clear();
             forward_durations.clear();
-            reverse_durations.clear();
+            backward_durations.clear();
             connect_durations.clear();
 
             if (this->_best_goal.first == nullptr) {
@@ -309,16 +309,16 @@ namespace acsr {
             }
 
             node = _best_goal.second;
-            reverse_durations.push_back(0);
-            reverse_control.push_back(Eigen::VectorXd(_dynamic_system->getControlDimension()));
+            backward_durations.push_back(0);
+            backward_control.push_back(Eigen::VectorXd(_dynamic_system->getControlDimension()));
             while (node) {
-                reverse_states.push_back(node->getState());
-                reverse_control.push_back(node->getEdgeControl());
-                reverse_durations.push_back(node->getEdgeDuration());
+                backward_states.push_back(node->getState());
+                backward_control.push_back(node->getEdgeControl());
+                backward_durations.push_back(node->getEdgeDuration());
                 node = node->getParent();
             }
-            reverse_durations.pop_back();
-            reverse_control.pop_back();
+            backward_durations.pop_back();
+            backward_control.pop_back();
 
             if (_planner_connection != nullptr && _planner_connection->_end_states == _best_goal) {
                 connect_states = _planner_connection->_states;
@@ -388,33 +388,33 @@ namespace acsr {
                 }
             }
 
-            VariablesGrid reverse_grid;
-            reverse_grid.addVector(reverse_states.back(),0.0);
-            for(int i=reverse_states.size()-1;i>0;--i){
-                auto current_state = reverse_states[i];
-                auto current_control=reverse_control[i];
-                int steps = reverse_durations[i]/_dynamic_system->getStepSize();
+            VariablesGrid backward_grid;
+            backward_grid.addVector(backward_states.back(),0.0);
+            for(int i=backward_states.size()-1;i>0;--i){
+                auto current_state = backward_states[i];
+                auto current_control=backward_control[i];
+                int steps = backward_durations[i]/_dynamic_system->getStepSize();
                 for(auto j=0;j<steps;++j){
                     current_state = forward(current_state,current_control,_dynamic_system->getStepSize());
-                    reverse_grid.addVector(current_state,reverse_grid.getLastTime()+_dynamic_system->getStepSize());
+                    backward_grid.addVector(current_state,backward_grid.getLastTime()+_dynamic_system->getStepSize());
                 }
             }
-            for(int i=reverse_grid.getNumPoints()-1;i>=0;--i){
+            for(int i=backward_grid.getNumPoints()-1;i>=0;--i){
                 t+=_dynamic_system->getStepSize();
-                if(maxDistance(reverse_grid.getVector(i),current_state)>25e-6){
-                    current_state = reverse_grid.getVector(i);
+                if(maxDistance(backward_grid.getVector(i),current_state)>25e-6){
+                    current_state = backward_grid.getVector(i);
                     forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
                     t = 0.0;
                 }
                 /*
                 if(std::abs(t-2.0)<Config::integration_step) {
-                    forward_grid.addVector(reverse_grid.getVector(i)*1e6, forward_grid.getLastTime()+t);
+                    forward_grid.addVector(backward_grid.getVector(i)*1e6, forward_grid.getLastTime()+t);
                     t=0.0;
                 }*/
             }
 
             if(t>_dynamic_system->getStepSize()){
-                forward_grid.addVector(reverse_grid.getVector(0)*1e6, forward_grid.getLastTime()+t);
+                forward_grid.addVector(backward_grid.getVector(0)*1e6, forward_grid.getLastTime()+t);
             }
 
             std::stringstream ss;
@@ -457,9 +457,9 @@ namespace acsr {
 
             auto total_duration = _best_goal.first->getCost() + _best_goal.second->getCost() + std::accumulate(connect_durations.begin(),connect_durations.end(),0.0);
 
-            auto reverse_t = 0.0;
-            auto reverse_current_state = reverse_states.back();
-            g.addVector(reverse_states.back(),total_duration);
+            auto backward_t = 0.0;
+            auto backward_current_state = backward_states.back();
+            g.addVector(backward_states.back(),total_duration);
 
             for(auto i=reverse_states.size()-1;i>=0;--i){
                 auto t = reverse_durations[i];
