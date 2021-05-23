@@ -6,7 +6,7 @@ int main() {
 
     RunPlanner run_planner;
     run_planner.init();
-    run_planner.runByTcp();
+    run_planner.run();
     //run_planner.run();
     //std::cout << "Hello, World!" << std::endl;
     /*

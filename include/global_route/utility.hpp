@@ -193,7 +193,7 @@ namespace acsr {
             for (auto i = 0; i < n_wire - 1; ++i) {
                 for (auto j = i + 1; j < n_wire; ++j) {
                     auto t = (abs(state[i].first - state[j].first) + abs(state[i].second - state[j].second));
-                    //d1 *= t;
+                    d1 *= t;
                     d2 += t;
                 }
             }

@@ -17,11 +17,14 @@ namespace acsr{
         SystemConfig()=default;
         virtual ~SystemConfig()=default;
 
-        static double max_distance;
-        static int http_port;
-        static int tcp_port;
+        static double max_distance; ///the distance for dividing final solution sending to labview
+        static int http_port; /// http port
+        static int tcp_port; /// tcp port
 
-
+        /***
+         * read config file
+         * @param file_name config file name
+         */
         static void readFile(std::string file_name){
             po::options_description opt_desc("Options");
             opt_desc.add_options()
@@ -33,15 +36,14 @@ namespace acsr{
             po::variables_map varmap;
             std::ifstream ifs( file_name.c_str());
             if( !ifs.is_open() )
-                std::cout << "no such file." << std::endl;
+                std::cout << "reading system config file fails." << std::endl;
             else
             {
                 po::store( po::parse_config_file( ifs, opt_desc ), varmap );
                 po::notify( varmap );
                 std::cout << "read system config file done.\n" << std::endl;
             }
-
-            SystemConfig::max_distance*=1e-6;
+            SystemConfig::max_distance*=1e-6; /// convert um to m
         }
     };
 

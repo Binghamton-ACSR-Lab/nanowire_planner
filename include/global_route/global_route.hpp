@@ -193,7 +193,7 @@ namespace acsr {
             for (auto i = 0; i < n_wire; ++i)
                 dimension = dimension * 16;
             auto processor = std::thread::hardware_concurrency();
-            for (auto over_step = 0; over_step < 2; ++over_step) {
+            for (auto over_step = 0; over_step < 3; ++over_step) {
                 auto step = getHeuristic(n_wire, init_index, target_index) + over_step;
                 target = nullptr;
                 root = std::make_shared<TransitionTreeNode>(init_index, 0);

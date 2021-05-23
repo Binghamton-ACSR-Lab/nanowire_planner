@@ -22,70 +22,66 @@ namespace acsr {
     class RunPlanner {
 
     public:
+        /***
+         * default constructor
+         */
         RunPlanner() {
-
-
-            //is_running = false;
-
-            ///start http server
-
         };
 
+        /***
+         * necessary initialization
+         */
         void init(){
             //read config files
-
             PlannerConfig::readFile("config/planner.cfg");
             SystemConfig::readFile("config/system.cfg");
-
             nanowire_config = std::make_shared<NanowireConfig>();
             nanowire_config->readFile("config/nanowire.cfg");
 
-
+            //callback function for tcp server and http server, to parse string to command from clients
             auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
+
+            // start tcp server
             tcp_server = std::make_shared<TcpServer> (SystemConfig::tcp_port);
             std::cout<<"start tcp server at port "<<SystemConfig::tcp_port<<std::endl;
             tcp_server->run(callback);
 
+            ///start http server
             http_observer = std::make_shared<HttpServer>(SystemConfig::http_port);
             std::cout<<"start http server at port "<<SystemConfig::http_port<<std::endl;
             svg_observer = std::make_shared<SvgObserver>();
             http_observer->run(callback);
+
+            ///set tcp_server as message displayer
             message_displayers.push_back(tcp_server);
         }
 
-        void initFromTcp(){
-
-        }
-
-        void run() {
-
+        /***
+         *
+         */
+        void performanceTest(int wire_count) {
             nanowire_config = std::make_shared<NanowireConfig>();
             nanowire_config->readFile("config/nanowire.cfg");
-            nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
+            nanowire_system = std::make_shared<NanowireSystem>(wire_count,nanowire_config);
 
             http_observer->reset();
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
 
-///necessary setting
+            ///necessary setting
             planner->setStartState(PlannerConfig::init_state);
             planner->setTargetState(PlannerConfig::goal_state);
             planner->setGoalRadius(PlannerConfig::goal_radius);
             //planner->setRandomSeed(time(NULL));
 
-            svg_observer->setNanowireConfig(nanowire_config);
+            svg_observer->setNanowireConfig(wire_count,nanowire_config);
 
             planner->registerSolutionUpdateObserver(svg_observer);
             planner->registerPlannerStartObserver(svg_observer);
             planner->registerSolutionUpdateObserver(http_observer);
             planner->registerPlannerStartObserver(http_observer);
             planner->registerNodeAddedObserver(svg_observer);
-
-
-
-
             planner->setup(nanowire_config);
             std::cout<<"Goal Radius: "<<PlannerConfig::goal_radius<<std::endl;
-
             std::thread forward_thread,reverse_thread,connecting_thread;
 
             ///forward step threadcc
@@ -159,28 +155,40 @@ namespace acsr {
 
         }
 
-        void runByTcp(){
-
-            int v = 0;
+        /***
+         * start and linsten command from server
+         */
+        void run(){
+            ///waiting unitil receiving exit command
             while(!exit_flag){
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                ++v;
-                if(v==1000){
-                    v=0;
-                    //server.displayMessage("Hello");
+                if(!run_flag) {
+                    showMessage("waiting command");
+                }else{
+                    std::cout<<"planner is running\n Number of Node: ";
+                    auto nodes_count = planner->getNumberOfNode();
+                    std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
+                    std::cout<<"Solution Quality: "<<planner->getMaxCost()<<'\n';
+                    std::cout.flush();
+                    svg_observer->update();
                 }
+                std::this_thread::sleep_for (std::chrono::seconds(2));
             }
-
         }
 
-
+        /***
+         * parse command
+         * @param buffer command string
+         * @param size command string size
+         * @return
+         */
         std::string parseCommand(const char* buffer,size_t size){
             std::string s(buffer,size);
+            showMessage("Receive Command:\n\t" + s);
             std::string msg;
-            boost::to_upper(s);
+            boost::to_upper(s); /// to upper case
             boost::trim(s);
             std::vector<std::string> strs;
-            //boost::algorithm::split()
+            ///split command string
             boost::split(strs, s, boost::is_any_of("\t\n, "),boost::token_compress_on);
 
             if(strs[0]=="START"){
@@ -466,7 +474,6 @@ namespace acsr {
             optimize_run_flag = false;
             forward_run_flag = false;
             reverse_run_flag = false;
-            notify_flag = false;
         }
 
         void exit(){
@@ -481,30 +488,20 @@ namespace acsr {
                 showMessage("waiting planner to reset!");
                 planner->stop();
             }
-
-            //nanowire_config = std::make_shared<NanowireConfig>();
-            //nanowire_config->readFile("config/nanowire.cfg");
-            //nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
-
-            //read config files
-
             http_observer->reset();
 
-
-            nanowire_config->setNanowireCount(_n_wires);
-            nanowire_config->setZeta(zeta);
-            nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
-            nanowire_system->setStart();
-
+            nanowire_system = std::make_shared<NanowireSystem>(_n_wires,nanowire_config);
+            nanowire_system->reset();
             Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),nanowire_system->getRobotCount());
-            nanowire_system->setHeight(height_vec);
+            Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*nanowire_system->getRobotCount());
+            nanowire_system->setVarible(zeta_vec,height_vec);
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
 
             planner->setStartState(Eigen::Map<Eigen::VectorXd>(_init_states.data(),2*_n_wires));
             planner->setTargetState(Eigen::Map<Eigen::VectorXd>(_target_states.data(),2*_n_wires));
             planner->setGoalRadius(PlannerConfig::goal_radius);
 
-            svg_observer->setNanowireConfig(nanowire_config);
+            svg_observer->setNanowireConfig(_n_wires,nanowire_config);
             planner->registerSolutionUpdateObserver(svg_observer);
             planner->registerPlannerStartObserver(svg_observer);
             planner->registerSolutionUpdateObserver(http_observer);
@@ -535,25 +532,6 @@ namespace acsr {
                 connecting_thread = std::thread(&RunPlanner::connecting,this);
                 connecting_thread.detach();
             }
-            while(!notify_stopped_flag){}
-            notify_flag = true;
-            std::thread timer([this](){
-                while(notify_flag){
-                    std::cout<<"planner is running\n Number of Node: ";
-                    auto nodes_count = planner->getNumberOfNode();
-                    std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
-                    std::cout<<"Solution Quality: "<<planner->getMaxCost()<<'\n';
-                    std::cout.flush();
-
-                    svg_observer->update();
-                    std::this_thread::sleep_for (std::chrono::seconds(2));
-                    notify_stopped_flag =false;
-                }
-                notify_stopped_flag = true;
-
-            });
-            timer.detach();
-
             VariablesGrid vg;
             vg.read("reference_path.txt");
             run_flag = true;
@@ -570,13 +548,14 @@ namespace acsr {
             http_observer->reset();
             //nanowire_config->readFile("config/nanowire.cfg");
             //nanowire_config->setNanowireCount(_n_wires);
-            nanowire_config->setZeta(zeta);
+            //nanowire_config->setZeta(zeta);
             //Config::readFile("config/planner.cfg");
             //nanowire_system = std::make_shared<NanowireSystem>(nanowire_config);
 
-            Eigen::Map<Eigen::VectorXd> zp(zeta.data(), 2 * nanowire_config->getNanowireCount());
-            nanowire_system->setZetaPotential(zp);
-            nanowire_system->setStart();
+            Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),nanowire_system->getRobotCount());
+            Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*nanowire_system->getRobotCount());
+            nanowire_system->setVarible(zeta_vec,height_vec);
+            nanowire_system->reset();
 
             planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
             planner->setStartState(Eigen::Map<Eigen::VectorXd>(_init_states.data(),2*_n_wires));
@@ -613,24 +592,7 @@ namespace acsr {
                 connecting_thread = std::thread(&RunPlanner::connecting,this);
                 connecting_thread.detach();
             }
-            while(!notify_stopped_flag){}
-            notify_flag = true;
-            std::thread timer([this](){
-                while(notify_flag){
-                    std::cout<<"planner is running\n Number of Node: ";
-                    auto nodes_count = planner->getNumberOfNode();
-                    std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
-                    std::cout<<"Solution Quality: "<<planner->getMaxCost()<<'\n';
-                    std::cout.flush();
 
-                    svg_observer->update();
-                    std::this_thread::sleep_for (std::chrono::seconds(2));
-                    notify_stopped_flag =false;
-                }
-                notify_stopped_flag = true;
-
-            });
-            timer.detach();
             VariablesGrid vg;
             vg.read("reference_path.txt");
             run_flag = true;
@@ -639,27 +601,27 @@ namespace acsr {
 
 
     private:
-        std::shared_ptr<Planner> planner;
-
-
-        ///dynamic system
-        std::shared_ptr<NanowireSystem> nanowire_system;
-
+        std::shared_ptr<Planner> planner; //planner
+        std::shared_ptr<NanowireSystem> nanowire_system; //nanowire system
 
         ///running flags
         std::atomic_bool forward_run_flag{false};
         std::atomic_bool reverse_run_flag{false};
         std::atomic_bool optimize_run_flag{false};
+        //run flag to check the planner is started
+        std::atomic<bool> run_flag{false};
 
+        ///stop flags, to check whether the threads are terminated.
+        /// note run_flag and stopped_flag could be both false
         std::atomic_bool forward_stopped_flag{true};
         std::atomic_bool reverse_stopped_flag{true};
         std::atomic_bool optimize_stopped_flag{true};
 
-        std::atomic<bool> run_flag{false};
+        ///
         std::atomic<bool> exit_flag{false};
 
-        std::atomic<bool> notify_flag{false};
-        std::atomic<bool> notify_stopped_flag{true};
+        //std::atomic<bool> notify_flag{false};
+        //std::atomic<bool> notify_stopped_flag{true};
 
         //std::atomic_bool is_running;
         ///observers
@@ -677,10 +639,13 @@ namespace acsr {
         std::vector<double> _target_states;
         std::vector<double> _height;
         std::vector<std::shared_ptr<MessageDisplayer>> message_displayers;
-
         std::shared_ptr<TcpServer> tcp_server;
 
     private:
+        /***
+         * show message to displayer
+         * @param msg
+         */
         void showMessage(const std::string& msg){
             std::cout<<msg<<'\n';
             for(auto& d:message_displayers)

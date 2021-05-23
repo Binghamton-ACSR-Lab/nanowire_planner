@@ -106,7 +106,6 @@ namespace acsr{
             {
                 if(previous_node->isActive())
                 {
-                    //removeNodeFromSet(previous_node);
                     removePointFromContainer(previous_node);
                     previous_node->setActive(false);
                 }
@@ -118,7 +117,6 @@ namespace acsr{
                     previous_node = std::static_pointer_cast<SSTTreeNode>(next);
                 }
             }
-            //witness_sample->setMonitorNode(new_node);
             map[iv] = new_node;
             //new_node->setProxNode(witness_sample);
             new_node->setActive(true);
@@ -215,22 +213,22 @@ namespace acsr{
          * @param node
          */
         virtual void removePointFromContainer(TreeNodePtr node){
-            if(node== nullptr)
+            if(node== nullptr )
                 return;
+            node->setTreeNodeState(TreeNodeState::not_in_tree);
             if(node->getTreeId()==TreeId::forward){
                 std::scoped_lock<std::mutex> lock1(forward_tree_mutex);
-                this->forward_tree.erase(node->getState());
-                //removeNodeFromSet(node);
-                node->setTreeNodeState(TreeNodeState::not_in_tree);
-                this->_number_of_nodes.first-=1;
-
+                if(forward_tree.find(node->getState())!=forward_tree.end()) {
+                    this->forward_tree.erase(node->getState());
+                    this->_number_of_nodes.first -= 1;
+                }
             }
             else if(node->getTreeId()==TreeId::reverse){
                 std::scoped_lock<std::mutex> lock1(reverse_tree_mutex);
-                reverse_tree.erase(node->getState());
-                //removeNodeFromSet(node);
-                node->setTreeNodeState(TreeNodeState::not_in_tree);
-                this->_number_of_nodes.second-=1;
+                if(reverse_tree.find(node->getState())!=reverse_tree.end()) {
+                    reverse_tree.erase(node->getState());
+                    this->_number_of_nodes.second -= 1;
+                }
             }
         }
 

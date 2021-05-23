@@ -116,10 +116,12 @@ namespace acsr {
 
 
         virtual void onNodeAdded(const Eigen::VectorXd& state,TreeId id) = 0;
-
         virtual ~NodeAddedObserver()=default;
     };
 
+    /***
+     * an interface to show string message
+     */
     class MessageDisplayer{
     public:
         MessageDisplayer() = default;

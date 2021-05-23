@@ -25,6 +25,7 @@ namespace acsr {
         int index = 0; ///updated index
         std::string shared_image_name;
         std::mutex m;
+        int _n_wire;
     public:
         /***
          * default constructor
@@ -46,12 +47,14 @@ namespace acsr {
          * set dynamic system params
          * @param config nanowire dynamic system config
          */
-        void setNanowireConfig(const std::shared_ptr<NanowireConfig>& config){
+        void setNanowireConfig(int wire_count, const std::shared_ptr<NanowireConfig>& config){
+            _n_wire = wire_count;
             _nanowire_config = config;
             width = 600*(_nanowire_config->getElectrodesCols()-1) *zoom;
             height = 600*(_nanowire_config->getElectrodesRows()-1) *zoom;
-
         }
+
+
 
         /**
          * this function will be called when planner starts
@@ -102,7 +105,7 @@ namespace acsr {
             shared_image_name = image_name;
 
             ///draw reference path
-            for(auto i=0;i<_nanowire_config->getNanowireCount();++i) {
+            for(auto i=0;i<_n_wire;++i) {
                 Stroke stroke(width/100, colors[i]);
                 Polyline ref_path(stroke);
                 for(auto j=0;j<reference_path.getNumPoints();++j){
@@ -142,7 +145,7 @@ namespace acsr {
             ///copy the electrodes system image
             Document image(solution_image);
 
-            for(auto i=0;i<_nanowire_config->getNanowireCount();++i) {
+            for(auto i=0;i<_n_wire;++i) {
                 ///forward path
                 Stroke forward_stroke(2, colors[i]);
                 Polyline forward_path(forward_stroke);

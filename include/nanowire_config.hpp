@@ -85,11 +85,11 @@ namespace acsr {
 
         std::string data_file_name;///field data file name
 
-        int nanowire_count;///nanowire count
+        //int nanowire_count;///nanowire count
 
         int nanowire_index_for_image;    ///the nanowire index for the path shown in image
 
-        std::vector<double> zeta_potential_vec;///zeta potential
+        ///std::vector<double> zeta_potential_vec;///zeta potential
 
 
     public:
@@ -194,12 +194,13 @@ namespace acsr {
         }
 
         /***
-     * get nanowire count
-     * @return
-     */
+         * get nanowire count
+         * @return
+         */
+         /*
         int getNanowireCount() const {
             return nanowire_count;
-        }
+        }*/
 
         /***
      * get the nanowire index for the path shown in image
@@ -209,22 +210,26 @@ namespace acsr {
             return nanowire_index_for_image;
         }
 
+        /*
         void setNanowireCount(int n_wire) {
             nanowire_count = n_wire;
-        }
+        }*/
 
+        /*
         void setZeta(const std::vector<double> &zeta) {
             assert(zeta.size() == 2 * nanowire_count);
             zeta_potential_vec = zeta;
-        }
+        }*/
 
         /***
      * get zeta potential
      * @return
      */
+
+        /*
         std::vector<double> getZetaPotentialVec() const {
             return zeta_potential_vec;
-        }
+        }*/
 
 
         Eigen::Vector2d electrodePositionToPosition(const Eigen::Vector2i &electrode_position) {
@@ -263,8 +268,8 @@ namespace acsr {
         void readFile(std::string file_name) {
             po::options_description opt_desc("Options");
             opt_desc.add_options()
-                    ("nanowire_count", po::value<int>()->default_value(3), "nanowire count")
-                    ("zeta_potential", po::value<std::string>()->default_value("1 1 1 1"), "zeta potential.")
+                    //("nanowire_count", po::value<int>()->default_value(3), "nanowire count")
+                    //("zeta_potential", po::value<std::string>()->default_value("1 1 1 1"), "zeta potential.")
                     ("type", po::value<std::string>()->default_value("cc600"), "electrode system type")
                     ("dimension", po::value<int>()->default_value(2), "electrode system dimension")
                     ("height", po::value<double>()->default_value(180), "electrode system height")
@@ -288,11 +293,12 @@ namespace acsr {
                 std::cout<<"read nanowire config file completed\n";
             }
 
+            /*
             if (varmap.count("nanowire_count")) {
                 nanowire_count = varmap["nanowire_count"].as<int>();
             } else {
                 std::cout << "Nanowire Config File Error\n";
-            }
+            }*/
 
             if (varmap.count("dimension")) {
                 dimension = varmap["dimension"].as<int>();
@@ -368,12 +374,13 @@ namespace acsr {
                 std::cout << "Nanowire Config File Error\n";
             }*/
 
+            /*
             zeta_potential_vec.resize(2 * nanowire_count);
             if (varmap.count("zeta_potential")) {
                 std::stringstream stream(varmap["zeta_potential"].as<std::string>());
                 for (auto i = 0; i < 2 * nanowire_count; ++i)
                     stream >> zeta_potential_vec[i];
-            }
+            }*/
 
             std::cout << "Read Nanowire Config File Finished.\n";
         }

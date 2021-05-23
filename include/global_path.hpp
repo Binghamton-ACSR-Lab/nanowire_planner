@@ -19,7 +19,7 @@ namespace acsr {
 
         virtual ~GlobalPath() = default;
 
-        bool init(const Eigen::VectorXd &init_state, const Eigen::VectorXd &target_state,std::shared_ptr<NanowireConfig> nanowire_config) {
+        bool init(int wire_count,const Eigen::VectorXd &init_state, const Eigen::VectorXd &target_state,std::shared_ptr<NanowireConfig> nanowire_config) {
 
             if(nanowire_config->getType()=="cc600") {
                 if (!boost::filesystem::exists("data/reference_speed_cc600.txt")) {
@@ -40,7 +40,8 @@ namespace acsr {
                 //ref_time.print(std::cout);
             }
 
-            _n_wires = nanowire_config->getNanowireCount();
+            //_n_wires = nanowire_config->getNanowireCount();
+            _n_wires = wire_count;
             _init_state = init_state;
             _target_state = target_state;
             _nanowire_config = nanowire_config;
@@ -53,19 +54,6 @@ namespace acsr {
                     ref_time.setTime(i, multiply * ref_time.getTime(i));
                 }
             }
-
-
-
-            //nanowire_config = std::make_shared<NanowireConfig>();
-            //nanowire_config->readFile()
-
-            //global_paths.clear();
-            //states_vectors.clear();
-
-
-            //electrodes_ends = std::map<double, std::pair<std::vector<electrode_position_t>, std::vector<electrode_position_t>>>();
-
-            //generateGlobalPaths();
         }
 
         void getStartTargetElectordes(){
@@ -146,7 +134,7 @@ namespace acsr {
                 //std::cout << "Iteration: " << k << std::endl;
                 global::NanowirePositionType init_state;
                 global::NanowirePositionType target_state;
-                for (auto i = 0; i < _nanowire_config->getNanowireCount(); ++i) {
+                for (auto i = 0; i < _n_wires; ++i) {
                     init_state.push_back(std::make_pair(global_start_target[k].first[i](0),global_start_target[k].first[i](1)));
                     target_state.push_back(std::make_pair(global_start_target[k].second[i](0),global_start_target[k].second[i](1)));
                 }
