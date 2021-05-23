@@ -7,7 +7,7 @@
 #include <utility>
 #include <numeric>
 #include <random>
-#include <system_config.hpp>
+#include <config/system_config.hpp>
 #include "nanowire_system.hpp"
 #include "nanowire_utility.hpp"
 #include "observer/observer.hpp"

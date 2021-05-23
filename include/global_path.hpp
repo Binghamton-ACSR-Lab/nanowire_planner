@@ -5,7 +5,7 @@
 #ifndef NANOWIREPLANNER_GLOBAL_PATH_HPP
 #define NANOWIREPLANNER_GLOBAL_PATH_HPP
 #include "acado/acado_toolkit.hpp"
-#include "nanowire_config.hpp"
+#include "config/nanowire_config.hpp"
 #include <boost/filesystem.hpp>
 #include "nanowire_utility.hpp"
 #include <fstream>

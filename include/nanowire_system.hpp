@@ -9,8 +9,8 @@
 #include <iostream>
 #include <acado/acado_toolkit.hpp>
 #include <acado/acado_optimal_control.hpp>
-#include "nanowire_config.hpp"
-#include "planner_config.hpp"
+#include "config/nanowire_config.hpp"
+#include "config/planner_config.hpp"
 #include "tree_node.hpp"
 #include "nanowire_utility.hpp"
 #include "svg.hpp"

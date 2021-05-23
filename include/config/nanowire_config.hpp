@@ -132,17 +132,17 @@ namespace acsr {
         }
 
         /***
-     * get electrodes space
-     * @return
-     */
+         * get electrodes space
+         * @return
+         */
         double getColumnSpace() const {
             return column_space;
         }
 
         /***
-     * get electrodes rows
-     * @return
-     */
+         * get electrodes rows
+         * @return
+         */
         int getElectrodesRows() const {
             return electrodes_row;
         }
@@ -156,9 +156,9 @@ namespace acsr {
         }
 
         /***
-     * get field data rows(181)
-     * @return
-     */
+         * get field data rows(181)
+         * @return
+         */
         int getFieldDataRows() const {
             return field_data_rows;
         }
@@ -176,9 +176,9 @@ namespace acsr {
         }
 
         /***
-     * get field data file name
-     * @return
-     */
+         * get field data file name
+         * @return
+         */
         std::string getFieldDataFileName() const {
             if (type == "cc60") {
                 if(dimension==2)
@@ -203,34 +203,12 @@ namespace acsr {
         }*/
 
         /***
-     * get the nanowire index for the path shown in image
-     * @return
-     */
+         * get the nanowire index for the path shown in image
+         * @return
+         */
         int getNanowirePathIndex() const {
             return nanowire_index_for_image;
         }
-
-        /*
-        void setNanowireCount(int n_wire) {
-            nanowire_count = n_wire;
-        }*/
-
-        /*
-        void setZeta(const std::vector<double> &zeta) {
-            assert(zeta.size() == 2 * nanowire_count);
-            zeta_potential_vec = zeta;
-        }*/
-
-        /***
-     * get zeta potential
-     * @return
-     */
-
-        /*
-        std::vector<double> getZetaPotentialVec() const {
-            return zeta_potential_vec;
-        }*/
-
 
         Eigen::Vector2d electrodePositionToPosition(const Eigen::Vector2i &electrode_position) {
             if (electrode_position(0) >= electrodes_row || electrode_position(0) < 0 ||
@@ -366,22 +344,6 @@ namespace acsr {
             } else {
                 std::cout << "Nanowire Config File Error\n";
             }
-
-            /*
-            if (varmap.count("data_file_name")) {
-                data_file_name = varmap["data_file_name"].as<std::string>();
-            } else {
-                std::cout << "Nanowire Config File Error\n";
-            }*/
-
-            /*
-            zeta_potential_vec.resize(2 * nanowire_count);
-            if (varmap.count("zeta_potential")) {
-                std::stringstream stream(varmap["zeta_potential"].as<std::string>());
-                for (auto i = 0; i < 2 * nanowire_count; ++i)
-                    stream >> zeta_potential_vec[i];
-            }*/
-
             std::cout << "Read Nanowire Config File Finished.\n";
         }
     };
@@ -506,6 +468,9 @@ namespace acsr {
 
         }
 
+        /***
+         * deconstructor
+         */
         ~EpField() {
             int pages = nanowire_config->getElectrodesRows() * nanowire_config->getElectrodesCols();
             if(nanowire_config->getDimension()==2 && value != nullptr){
@@ -547,6 +512,7 @@ namespace acsr {
             auto rows = nanowire_config->getFieldDataRows();
             auto columns = nanowire_config->getFieldDataCols();
 
+            ///if no binary file,read txt file and generate a binary file
             if (!boost::filesystem::exists(binary_file_name)) {
                 std::ifstream myfile(file_str);
                 if (!myfile.is_open()) {
@@ -574,6 +540,7 @@ namespace acsr {
                     for(auto i=0;i<layers;i++){
                         for(auto j=0;j<columns;j++){
                             for(auto m=0;m<rows;m++)
+                                ///cannot apply "read" since some values are NaN
                                 for(int k=0;k<2*pages;k++) {
                                     float s=0.0;
                                     if(!(myfile>>s)){
@@ -591,12 +558,13 @@ namespace acsr {
                     for(auto i=0;i<2*pages;++i){
                         for(auto j=0;j<rows;++j)
                             for(auto m=0;m<columns;++m)
+                                ///write 1-D data
                                 fil.write(reinterpret_cast<char*>(value3d[i][j][m]), layers*sizeof(float));
                     }
                     fil.close();
                     return true;
                 }
-            }else{
+            }else{ ///if exist binary file, read this file directly
                 if(nanowire_config->getDimension()==2){
                     std::fstream fil;
                     fil.open(binary_file_name, std::ios::in | std::ios::binary);
@@ -615,6 +583,7 @@ namespace acsr {
                         for (auto i = 0; i < 2 * pages; ++i) {
                             for (auto j = 0; j < rows; ++j)
                                 for (auto m = 0; m < columns; ++m) {
+                                    ///read only applied to 1-D data
                                     fil.read(reinterpret_cast<char *>(value3d[i][j][m]), layers * sizeof(float));
                                 }
                         }
@@ -650,9 +619,8 @@ namespace acsr {
                     }
                 }
             }
+            ///mapping 2d-array to matrix
             mat_E = Eigen::Matrix<double,-1,-1,Eigen::RowMajor>::Map(&ex[0][0],2*wire_count,pages);
-            //for (int i = 0; i < 2 * wire_count; ++i)
-                //mat_E.row(i) = Eigen::VectorXd::Map(&ex[i][0], pages);
         }
     };
 }

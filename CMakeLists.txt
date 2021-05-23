@@ -16,6 +16,7 @@ file(GLOB source_files
         "include/planner/*.hpp"
         "include/observer/*.hpp"
         "include/global_route/*.hpp"
+        "include/config/*.hpp"
         )
 
 add_executable(NanowirePlanner main.cpp ${source_files})
@@ -23,7 +24,6 @@ target_link_libraries( NanowirePlanner
         acado_toolkit_s
         pthread
         ${CMAKE_THREAD_LIBS_INIT}
-        #${OpenCV_LIBS}
         ${Boost_FILESYSTEM_LIBRARY}
         ${Boost_THREAD_LIBRARY}
         ${Boost_SYSTEM_LIBRARY}
