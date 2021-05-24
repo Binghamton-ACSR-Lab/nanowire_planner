@@ -26,7 +26,6 @@ namespace acsr{
     };
 
     class SST : public Planner {
-
     protected:
         /***
          * override function
@@ -73,11 +72,10 @@ namespace acsr{
             if(getMaxCost() <= parent->getCost() + duration + _dynamic_system->getHeuristic(state,target_node->getState()))
                 return nullptr;
 
-
             auto& map = tree_id==TreeId::forward?forward_prox_map:backward_prox_map;
             auto iv = _dynamic_system->getGrid(state);
             SSTTreeNodePtr previous_node = nullptr;
-            if(map.find(iv)!=map.end())
+            if(map.find(iv)!=map.end() && !map[iv].expired())
                 previous_node = map[iv].lock();
             if(previous_node
                && previous_node->getCost() < parent->getCost() + duration)
@@ -85,38 +83,27 @@ namespace acsr{
 
             ///create a new tree node
             auto new_node = std::make_shared<SSTTreeNode>(tree_id,state);
-
-            ///create the link to the parent node
             new_node->setEdge({control,duration});
-
-            ///set this node's parent
             new_node->setParent(parent);
             new_node->setCost(parent->getCost() + duration);
-            new_node->setTreeNodeState(TreeNodeState::in_tree);
-
             ///set parent's child
             parent->addChild(new_node);
-            addPointToContainer(new_node);
 
             /// the original witness has a monitor node but that node has greater cost than the node we are working
-            if(previous_node)
-            {
-                if(previous_node->isActive())
-                {
-                    removePointFromContainer(previous_node);
-                    previous_node->setActive(false);
-                }
-
-                while( previous_node->getChildren().empty() && !previous_node->isActive() && !this->isInSolutionPath(previous_node))
-                {
+            if(previous_node){
+                previous_node->setActive(false);
+                removePointFromKdTree(previous_node);
+                while( previous_node->getChildren().empty() && !previous_node->isActive() && !this->isInSolutionPath(previous_node)){
                     auto next = previous_node->getParent();
                     removeLeaf(previous_node);
                     previous_node = std::static_pointer_cast<SSTTreeNode>(next);
                 }
             }
+
+            ///set new node as the current active point
             map[iv] = new_node;
-            //new_node->setProxNode(witness_sample);
             new_node->setActive(true);
+            addPointToKdTree(new_node);
             return new_node;
         }
 
@@ -128,19 +115,9 @@ namespace acsr{
 
             ///there're nodes within optimization_distance
             if(!nearest_vec_node.first.empty()){
-                //std::vector<SSTTreeNodePtr> nearest_vec(nearest_vec_node.first.size());
-
-                ///cast to SST node
-
-                //std::transform(nearest_vec_node.first.begin(),nearest_vec_node.first.end(),nearest_vec.begin(),[](const NodePtr & node){
-                //    return std::static_pointer_cast<SSTTreeNode>(node);
-                //});
-                ///sort according to cost
-
                 bool need_opt = false;
                 TreeNodePtr pair_node = nullptr;
                 for(auto& n : nearest_vec_node.first){
-
                     ///distance within goal radius, trying to update solution
                     if(this->_dynamic_system->distance(n->getState(),node->getState())<=this->_goal_radius && std::static_pointer_cast<TreeNode>(n)->getCost()+node->getCost() < this->getMaxCost()){
                         if(node->getTreeId() == TreeId::forward) {
@@ -153,7 +130,7 @@ namespace acsr{
                         notifySolutionUpdate();
                         branchBound(_root);
                         branchBound(_goal);
-                        //this->notifySolutionUpdate();
+                        notifySolutionUpdate();
                     }else{
                         need_opt = true;
                         pair_node = std::static_pointer_cast<TreeNode>(n);
@@ -169,7 +146,6 @@ namespace acsr{
                     }else{
                         optimize_set[d] = std::make_pair(pair_node,node);
                     }
-                    //node->setTreeNodeState(TreeNodeState::in_optimize_set);
                 }
             }
         }
@@ -190,17 +166,17 @@ namespace acsr{
          * add node to tree
          * @param node
          */
-        virtual void addPointToContainer(TreeNodePtr node){
+        virtual void addPointToKdTree(TreeNodePtr node){
             if(node->getTreeId()==TreeId::forward){
                 std::scoped_lock<std::mutex> lock1(forward_tree_mutex);
                 forward_tree.insert({node->getState(),node});
-                node->setTreeNodeState(TreeNodeState::in_tree);
+                //node->setTreeNodeState(TreeNodeState::in_tree);
                 this->_number_of_nodes.first+=1;
             }
             else if(node->getTreeId()==TreeId::backward){
                 std::scoped_lock<std::mutex> lock1(backward_tree_mutex);
                 backward_tree.insert({node->getState(),node});
-                node->setTreeNodeState(TreeNodeState::in_tree);
+                //node->setTreeNodeState(TreeNodeState::in_tree);
                 this->_number_of_nodes.second+=1;
             }
         }
@@ -209,10 +185,10 @@ namespace acsr{
          * remove node from tree
          * @param node
          */
-        virtual void removePointFromContainer(TreeNodePtr node){
+        virtual void removePointFromKdTree(TreeNodePtr node){
             if(node== nullptr )
                 return;
-            node->setTreeNodeState(TreeNodeState::not_in_tree);
+
             if(node->getTreeId()==TreeId::forward){
                 std::scoped_lock<std::mutex> lock1(forward_tree_mutex);
                 if(forward_tree.find(node->getState())!=forward_tree.end()) {
@@ -320,8 +296,8 @@ namespace acsr{
             min_value = std::numeric_limits<double>::max();
 
             for(auto temp_pair_node:nearest.first){
-                auto temp_tree_node = std::dynamic_pointer_cast<TreeNode>(temp_pair_node);
-                if(temp_tree_node->getTreeNodeState() == TreeNodeState::not_in_tree)
+                auto temp_tree_node = std::dynamic_pointer_cast<SSTTreeNode>(temp_pair_node);
+                if(!temp_tree_node->isActive())
                     continue;
                 auto temp_cost = this->_dynamic_system->getHeuristic(temp_tree_node->getState(),node->getState()) + temp_tree_node->getCost();
                 if( temp_cost < min_value){
@@ -340,14 +316,6 @@ namespace acsr{
             if(node->getParent()){
                 node->getParent()->removeChild(node);
             }
-            auto sst_node = std::dynamic_pointer_cast<SSTTreeNode>(node);
-            //if(sst_node->getProxNode()->getMonitorNode() == sst_node){
-            //    sst_node->getProxNode() -> setMonitorNode(nullptr);
-            //}
-            //sst_node->setProxNode(nullptr);
-            //removeNodeFromSet(node);
-            removePointFromContainer(node);
-            //node.reset();
         }
 
         /***
@@ -372,15 +340,11 @@ namespace acsr{
                 node->getParent()->removeChild(node);
             }
             auto sst_node = std::dynamic_pointer_cast<SSTTreeNode>(node);
-            //sst_node->setProxNode(nullptr);
-            //removeNodeFromSet(node);
-            removePointFromContainer(node);
-            node->setTreeNodeState(TreeNodeState::not_in_tree);
-            //node.reset();
-
+            removePointFromKdTree(node);
             for(auto& n:children){
                 removeBranch(n);
             }
+
 
         }
 
@@ -449,13 +413,13 @@ namespace acsr{
             ///init root and goal
             _root = std::make_shared<SSTTreeNode>(TreeId::forward, this->_init_state);
             _root->setEdge(TreeEdge(Eigen::VectorXd(this->_dynamic_system->getControlDimension()),0.0));
-            addPointToContainer(_root);
+            addPointToKdTree(_root);
             _goal = std::make_shared<SSTTreeNode>(TreeId::backward, this->_target_state);
             _goal->setEdge(TreeEdge(Eigen::VectorXd(this->_dynamic_system->getControlDimension()),0.0));
-            addPointToContainer(_goal);
+            addPointToKdTree(_goal);
 
-            _root->setTreeNodeState(TreeNodeState::in_tree);
-            _goal->setTreeNodeState(TreeNodeState::in_tree);
+            //_root->setTreeNodeState(TreeNodeState::in_tree);
+            //_goal->setTreeNodeState(TreeNodeState::in_tree);
             ///initial witness for root and goal
             //auto root_prox = std::make_shared<ProxNode>(this->_init_state);
             //_root->setProxNode(root_prox);
@@ -599,9 +563,9 @@ namespace acsr{
             }
 
             if(explore_node ==nullptr
-                || explore_node->getTreeNodeState()==TreeNodeState::not_in_tree
+                || !std::static_pointer_cast<SSTTreeNode>(explore_node)->isActive()
                 || target==nullptr
-                || target->getTreeNodeState()==TreeNodeState::not_in_tree
+                || !std::static_pointer_cast<SSTTreeNode>(target)->isActive()
                 || total_cost > this->getMaxCost()){
                 return;
             }
@@ -654,9 +618,6 @@ namespace acsr{
             }
         }
     };
-
-
-
 }
 
 

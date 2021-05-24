@@ -121,7 +121,7 @@ namespace acsr {
          * @param pt nanowire position
          * @return near electrodes vector
          */
-        static std::vector<Eigen::Vector2i> getNearElectrodes(const Eigen::Vector2d &pt) {
+        static std::vector<Eigen::Vector2i> getNearElectrodes(const Eigen::Vector2d &pt,int count) {
             //std::cout << column_space;
             int f0 = std::floor(pt(0) / electrodes_space);
             int c0 = std::ceil(pt(0) / electrodes_space);
@@ -140,7 +140,10 @@ namespace acsr {
             v.erase(std::remove_if(v.begin(), v.end(), [&](const Eigen::Vector2i &position) {
                 return (electrodePositionToPosition(position) - pt).norm() > electrodes_space * std::sqrt(2.0) / 2;
             }), v.end());
-            return v;
+            std::sort(v.begin(),v.end(),[pt](const Eigen::Vector2i &p1, const Eigen::Vector2i &p2){
+                return (electrodePositionToPosition(p1) - pt).norm() < (electrodePositionToPosition(p2) - pt).norm();
+            });
+            return std::vector<Eigen::Vector2i>(v.begin(),v.begin()+count);
         }
 
         /***

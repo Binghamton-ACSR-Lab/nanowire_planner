@@ -26,13 +26,12 @@ namespace acsr {
 /***
  * denote where the tree node
  */
+ /*
     enum TreeNodeState {
         not_in_tree = 0,
         in_tree
-        //in_open_set,
-        //in_close_set,
-        //in_optimize_set
     };
+*/
 
     using TreeEdge =std::pair<Eigen::VectorXd,double>;
 
@@ -115,7 +114,7 @@ namespace acsr {
         TreeEdge  _edge;
         double _cost;
         TreeId _tree_id;
-        TreeNodeState _tree_node_state;
+        //TreeNodeState _tree_node_state;
 
 
     public:
@@ -140,7 +139,7 @@ namespace acsr {
          * @param id: tree id
          * @param pt: node state
          */
-        explicit TreeNode(TreeId id, const Eigen::VectorXd &pt):Node(pt),_tree_id(id),_cost(0.0),_tree_node_state(not_in_tree) {
+        explicit TreeNode(TreeId id, const Eigen::VectorXd &pt):Node(pt),_tree_id(id),_cost(0.0) {
 
         }
 
@@ -188,18 +187,18 @@ namespace acsr {
         /***
          * set the state of the node,e.g. where it is
          * @param nodeState
-         */
+
         void setTreeNodeState(TreeNodeState nodeState) {
             _tree_node_state = nodeState;
-        }
+        }*/
 
         /***
          * get the state of the node, e.g. where it is
          * @return
-         */
+
         TreeNodeState getTreeNodeState() const {
             return _tree_node_state;
-        }
+        }*/
 
         /***
          * add a child

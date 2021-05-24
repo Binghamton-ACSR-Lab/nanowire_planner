@@ -61,22 +61,22 @@ namespace acsr {
                 target_state_vectors.push_back({_target_state(2*i),_target_state(2*i+1)});
             }
 
-            auto temp_start_vectors = NanowireConfig::getNearElectrodes(init_state_vectors.front());
+            auto temp_start_vectors = NanowireConfig::getNearElectrodes(init_state_vectors.front(),1);
             std::for_each(temp_start_vectors.begin(),temp_start_vectors.end(),[&](const Eigen::Vector2i& pt){
                 start_vectors.push_back(ElectordePositionType{pt});
             });
 
             for(uint i=1;i<_n_wires;++i){
-                auto temp = NanowireConfig::getNearElectrodes(init_state_vectors[i]);
+                auto temp = NanowireConfig::getNearElectrodes(init_state_vectors[i],1);
                 start_vectors = combineVectors(start_vectors,temp);
             }
 
-            auto temp_target_vectors = NanowireConfig::getNearElectrodes(target_state_vectors.front());
+            auto temp_target_vectors = NanowireConfig::getNearElectrodes(target_state_vectors.front(),1);
             std::for_each(temp_target_vectors.begin(),temp_target_vectors.end(),[&](const Eigen::Vector2i& pt){
                 target_vectors.push_back(ElectordePositionType{pt});
             });
             for(uint i=1;i<_n_wires;++i){
-                auto temp = NanowireConfig::getNearElectrodes(target_state_vectors[i]);
+                auto temp = NanowireConfig::getNearElectrodes(target_state_vectors[i],1);
                 target_vectors = combineVectors(target_vectors,temp);
             }
 

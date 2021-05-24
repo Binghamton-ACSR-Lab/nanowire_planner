@@ -101,7 +101,7 @@ namespace acsr{
          */
         bool forwardBlossom(const TreeNodePtr & parent,std::vector<PropagateParameters>& params){
 
-            if(parent->getTreeId()!=TreeId::forward || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
+            if(parent->getTreeId()!=TreeId::forward || !std::static_pointer_cast<SSTTreeNode>(parent)->isActive())
                 return false;
             bool return_value = false;
             std::map<double,PropagateParameters> quality_map;
@@ -139,7 +139,7 @@ namespace acsr{
          */
         bool backwardBlossom(const TreeNodePtr& parent,std::vector<PropagateParameters>& params){
 
-            if(parent->getTreeId()!=TreeId::backward || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
+            if(parent->getTreeId()!=TreeId::backward || !std::static_pointer_cast<SSTTreeNode>(parent)->isActive())
                 return false;
             bool return_value = false;
 
@@ -240,7 +240,7 @@ namespace acsr{
             ///select a node to be explored in forward tree
             TreeNodePtr parent= nullptr;
             if(!searchSelection(TreeId::forward,parent))return;
-            if(parent->getTreeNodeState()==TreeNodeState::not_in_tree)
+            if(!std::static_pointer_cast<SSTTreeNode>(parent)->isActive())
                 return;
             std::vector<PropagateParameters> params;
             if (forwardBlossom(parent,params)){
@@ -273,12 +273,12 @@ namespace acsr{
                 return;
             TreeNodePtr parent;
             searchSelection(TreeId::backward,parent);
-            if(parent->getTreeNodeState()==TreeNodeState::not_in_tree)return;
+            if(!std::static_pointer_cast<SSTTreeNode>(parent)->isActive())return;
 
             std::vector<PropagateParameters> params;
             if (backwardBlossom(parent,params)){
                 ///add parent to close map
-                if(parent==nullptr || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
+                if(parent==nullptr || !std::static_pointer_cast<SSTTreeNode>(parent)->isActive())
                     return;
                 for(auto& param:params){
                     auto new_node = addToTree(TreeId::backward,parent,param.state,param.control,param.duration);

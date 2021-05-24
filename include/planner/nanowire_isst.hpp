@@ -50,7 +50,7 @@ namespace acsr{
          */
         bool forwardBlossom(const SSTTreeNodePtr & parent,Eigen::VectorXd& state,Eigen::VectorXd& control,double& duration){
 
-            if(parent->getTreeId()!=TreeId::forward || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
+            if(parent->getTreeId()!=TreeId::forward || !parent->isActive())
                 return false;
             bool return_value = false;
 
@@ -85,7 +85,7 @@ namespace acsr{
          * @return true if blossom process success
          */
         bool backwardBlossom(const SSTTreeNodePtr& parent,Eigen::VectorXd& state,Eigen::VectorXd& control,double& duration){
-            if(parent->getTreeId()!=TreeId::backward || parent->getTreeNodeState()==TreeNodeState::not_in_tree)
+            if(parent->getTreeId()!=TreeId::backward || !parent->isActive())
                 return false;
             bool return_value = false;
             Eigen::VectorXd temp_state;
@@ -130,7 +130,7 @@ namespace acsr{
             ///select a node to be explored in forward tree
             TreeNodePtr parent;
             searchSelection(TreeId::forward,parent);
-            if(parent->getTreeNodeState()==TreeNodeState::not_in_tree)
+            if(!std::static_pointer_cast<SSTTreeNode>(parent)->isActive())
                 return;
 
             Eigen::VectorXd state;
@@ -167,7 +167,7 @@ namespace acsr{
                 return;
             TreeNodePtr parent;
             searchSelection(TreeId::backward,parent);
-            if(parent->getTreeNodeState()==TreeNodeState::not_in_tree)return;
+            if(!std::static_pointer_cast<SSTTreeNode>(parent)->isActive())return;
 
             Eigen::VectorXd state;
             Eigen::VectorXd control;
