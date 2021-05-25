@@ -13,22 +13,44 @@
 #include "observer/observer.hpp"
 
 namespace acsr {
+    /***
+     * struct to storing connecting segment information
+     */
     struct PlannerConnection{
     public:
 
+        /***
+         * default construct
+         */
         PlannerConnection() = delete;
+
+        /***
+         * construct
+         * @param end_states two ends states from forward and backward tree
+         * @param state a vector to store intermedia states from beginning states to target states
+         * @param controls a vector to store intermedia controls from beginning states to target states
+         * @param durations a vector to store intermedia duration from beginning states to target states
+         */
         PlannerConnection(std::pair<TreeNodePtr,TreeNodePtr> end_states,
                           std::vector<Eigen::VectorXd>& state,
                           std::vector<Eigen::VectorXd>& controls,
                           std::vector<double>& durations):
                 _states(std::move(state)),_controls(std::move(controls)),_durations(std::move(durations)),_end_states(std::move(end_states))
         {
-
         }
+
+        /***
+         * check if no data
+         * @return
+         */
         bool isEmpty(){
             return _durations.empty();
         }
 
+        /***
+         * get total cost of this connection segment
+         * @return
+         */
         double getTotalCost(){
             return std::accumulate(_durations.begin(),_durations.end(),0.0);
         }
@@ -39,25 +61,27 @@ namespace acsr {
         std::pair<TreeNodePtr,TreeNodePtr> _end_states;
     };
 
+    /***
+     * abstract class for planner
+     */
     class Planner {
 
     protected:
-        std::shared_ptr<NanowireSystem> _dynamic_system;
-        std::shared_ptr<PlannerConnection> _planner_connection;
+        std::shared_ptr<NanowireSystem> _dynamic_system; ///nanowire system
+        std::shared_ptr<PlannerConnection> _planner_connection;/// connecting segment
 
-        Eigen::VectorXd _init_state;
-        Eigen::VectorXd _target_state;
+        Eigen::VectorXd _init_state;///start state
+        Eigen::VectorXd _target_state;///target state
 
-        double _goal_radius;
+        double _goal_radius;///goal radius
 
-        std::pair<TreeNodePtr, TreeNodePtr> _best_goal;
-        std::pair<unsigned long, unsigned long> _number_of_nodes;
+        double _best_cost = std::numeric_limits<double>::max();
+        std::pair<TreeNodePtr, TreeNodePtr> _best_goal;///best goals
+        std::pair<unsigned long, unsigned long> _number_of_nodes;///nodes on kdtree
+        bool _is_bi_tree_planner = false; ///flag to indicate bi-tree
+        bool _is_optimized_connect = false;///flag to indicate adopting BVP to connect two trees
 
-        bool _is_bi_tree_planner = false;
-        bool _is_optimized_connect = false;
-
-
-
+        ///observers
         std::vector<std::shared_ptr<SolutionUpdateObserver>> solution_update_observers;
         std::vector<std::shared_ptr<PlannerStartObserver>> planner_start_observers;
         std::vector<std::shared_ptr<NodeAddedObserver>> node_added_observers;
@@ -65,12 +89,11 @@ namespace acsr {
         /// a flag to indicate the planner is stopped. This flag is used to terminate long time process
         std::atomic_bool _run_flag;
 
-
         /***
-        *
-        * @param node: a treenode
-        * @return check current best path going through node
-        */
+         * check whether a node is in path
+         * @param node
+         * @return
+         */
         bool isInSolutionPath(TreeNodePtr node) {
             if (_best_goal.first == nullptr) return false;
             if (node->getTreeId() == TreeId::forward) {
@@ -89,14 +112,13 @@ namespace acsr {
             return false;
         }
 
-
-
-
-
-
     public:
         Planner() = delete;
 
+        /***
+         * construct
+         * @param system
+         */
         explicit Planner(std::shared_ptr<NanowireSystem> system):_dynamic_system(system), _run_flag(false), _goal_radius(0.0) {
         }
 
@@ -355,12 +377,6 @@ namespace acsr {
                         forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
                         t = 0.0;
                     }
-                    /*
-                    if(std::abs(t-2.0)<Config::integration_step) {
-                        //std::cout<<j<<":"<<current_state.transpose()<<'\n';
-                        forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
-                        t = 0.0;
-                    }*/
                 }
             }
 
@@ -377,13 +393,6 @@ namespace acsr {
                             forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
                             t = 0.0;
                         }
-
-                        /*
-                        if(std::abs(t-2.0)<Config::integration_step) {
-                            forward_grid.addVector(current_state*1e6,
-                                                   forward_grid.getLastTime() + t);
-                            t=0.0;
-                        }*/
                     }
                 }
             }
@@ -406,11 +415,6 @@ namespace acsr {
                     forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
                     t = 0.0;
                 }
-                /*
-                if(std::abs(t-2.0)<Config::integration_step) {
-                    forward_grid.addVector(backward_grid.getVector(i)*1e6, forward_grid.getLastTime()+t);
-                    t=0.0;
-                }*/
             }
 
             if(t>_dynamic_system->getStepSize()){
@@ -420,80 +424,26 @@ namespace acsr {
             std::stringstream ss;
             forward_grid.print(ss,"","","",10,6,"\t","\n");
             solution_string=ss.str();
-
-            /*
-            VariablesGrid g;
-            g.addVector(forward_states.front(),0.0);
-            double time_interval = 2.0;
-            auto forward_t = 0.0;
-
-            auto current_state = forward_states[0];
-            for(auto i=1;i<forward_states.size();++i){
-                auto t = forward_durations[i];
-                current_state = forward_states[i];
-                while(t>time_interval-forward_t){
-                    auto state = forward(current_state,forward_control[i],(time_interval-forward_t));
-                    t-=time_interval;
-                    g.addVector(state,g.getLastTime()+time_interval);
-                    current_state = state;
-                    forward_t = 0;
-                }
-                forward_t =forward_t + time_interval - t;
-            }
-            if(!connect_states.empty()) {
-                for (auto i = 0; i < connect_states.size(); ++i) {
-                    auto t = connect_durations[i];
-                    current_state = connect_states[i];
-                    while (t > time_interval - forward_t) {
-                        auto state = forward(current_state, connect_control[i], (time_interval - forward_t));
-                        t -= time_interval;
-                        g.addVector(state, g.getLastTime() + time_interval);
-                        current_state = state;
-                        forward_t = 0;
-                    }
-                    forward_t = forward_t + time_interval - t;
-                }
-            }
-
-            auto total_duration = _best_goal.first->getCost() + _best_goal.second->getCost() + std::accumulate(connect_durations.begin(),connect_durations.end(),0.0);
-
-            auto backward_t = 0.0;
-            auto backward_current_state = backward_states.back();
-            g.addVector(backward_states.back(),total_duration);
-
-            for(auto i=reverse_states.size()-1;i>=0;--i){
-                auto t = reverse_durations[i];
-                reverse_current_state = reverse_states[i];
-                while(t>time_interval-reverse_t){
-                    auto state = forward(reverse_current_state,reverse_control[i],(time_interval-reverse_t));
-                    t-=time_interval;
-                    g.addVector(state,g.getLastTime()-time_interval);
-                    reverse_current_state = state;
-                    reverse_t = 0;
-                }
-                reverse_t =reverse_t + time_interval - t;
-            }
-
-            g.addVector(reverse_current_state,_planner_connection->getTotalCost()+_best_goal.first->getCost()+reverse_t);
-            g.print();
-            std::cout<<"g is here\n";*/
-
         }
 
-
         /***
-         *
-         * @return the cost of current path. return the max value of double type if no path exists
+         * update best cost
          */
-        virtual double getMaxCost() {
-            if (_best_goal.first == nullptr || _best_goal.second == nullptr)
-                return std::numeric_limits<double>::max();
-            double cost = _best_goal.first->getCost() + _best_goal.second->getCost();
-            if (_planner_connection != nullptr && _planner_connection->_end_states.first == _best_goal.first
-                && _planner_connection->_end_states.second == _best_goal.second) {
-                cost += _planner_connection->getTotalCost();
+        virtual void updateBestCost() {
+            if (_best_goal.first == nullptr || _best_goal.second == nullptr){
+                _best_cost = std::numeric_limits<double>::max();
+            }else {
+                double cost = _best_goal.first->getCost() + _best_goal.second->getCost();
+                if (_planner_connection != nullptr && _planner_connection->_end_states.first == _best_goal.first
+                    && _planner_connection->_end_states.second == _best_goal.second) {
+                    cost += _planner_connection->getTotalCost();
+                }
+                _best_cost = cost;
             }
-            return cost;
+        }
+
+        double getBestCost(){
+            return _best_cost;
         }
 
         /***
@@ -504,11 +454,12 @@ namespace acsr {
             _dynamic_system->stop();
         }
 
-
         /***
-             * notify planner start observers. This function should be manually called when starting a planner
-             */
-
+         * notify observers planning started
+         * @param planner_name planner name
+         * @param image_name image name
+         * @param reference reference path
+         */
        virtual void notifyPlannerStart(const std::string& planner_name,const std::string& image_name,const VariablesGrid& reference) {
            for(auto observer: planner_start_observers){
                observer->onPlannerStart(planner_name,
@@ -540,9 +491,8 @@ namespace acsr {
         }
 
         /***
-  * notify solution update observers. This function should be manually called when a solution is updated
-  */
-
+          * notify solution update observers. This function should be manually called when a solution is updated
+          */
         virtual void notifySolutionUpdate() {
             std::vector<Eigen::VectorXd> forward_state;
             std::vector<Eigen::VectorXd> reverse_state;
@@ -563,8 +513,6 @@ namespace acsr {
                 observer->onSolutionUpdate(forward_state,reverse_state,connect_state,forward_control,reverse_control,connect_control,forward_durations,reverse_durations,connect_durations,solution_string);
             }
         }
-
-
 
     };
 }

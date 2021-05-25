@@ -44,6 +44,7 @@ namespace acsr{
         static double quality_factor;
         static int dominant_path_count;
         static double search_p;
+        static int nearest_electrode_count;
 
         //Parameters for image output.
         static int image_width;
@@ -51,6 +52,10 @@ namespace acsr{
         static bool show_node;
 
 
+        /***
+         * read config file
+         * @param file_name config file name
+         */
         static void readFile(std::string file_name){
             po::options_description opt_desc("Options");
             opt_desc.add_options()
@@ -75,6 +80,7 @@ namespace acsr{
                     ("dominant_path_count",po::value<int>(&PlannerConfig::dominant_path_count),"ref-isst quality index count.")
                     ("quality_factor",po::value<double>(&PlannerConfig::quality_factor)->default_value(50.0),"isst quality parameter.")
                     ("quality_decrease_factor",po::value<double>(&PlannerConfig::quality_decrease_factor)->default_value(1.1),"isst quality parameter.")
+                    ("nearest_electrode_count",po::value<int>(&PlannerConfig::nearest_electrode_count)->default_value(1),"nearest electrode count, used for global refrence path")
                     ("search_p",po::value<double>(&PlannerConfig::search_p)->default_value(0.5),"reference isst search selection param.")
                     ("show_node",po::value<bool>(&PlannerConfig::show_node),"show node on image.")
                     ;
@@ -96,7 +102,6 @@ namespace acsr{
             {
                 std::stringstream stream(varmap["start_state"].as<std::string>());
                 double n; while(stream >> n) {state.push_back(n*1e-6);}
-                // state = varmap["start_state"].as<std::vector<double> >();
                 PlannerConfig::init_state = Eigen::VectorXd(state.size());
                 for(unsigned i=0;i<state.size();i++)
                 {
@@ -131,8 +136,6 @@ namespace acsr{
             PlannerConfig::sst_delta_near*=1e-6;
             PlannerConfig::goal_radius*=1e-6;
             PlannerConfig::optimization_distance*=1e-6;
-
-
         }
     };
 
@@ -150,7 +153,6 @@ namespace acsr{
     bool PlannerConfig::bidirection = false;
     bool PlannerConfig::intermedia_control = false;
     bool PlannerConfig::optimization = true;
-    //bool Config::intermediate_visualization = true;
     int PlannerConfig::image_width=500;
     int PlannerConfig::image_height=500;
     double PlannerConfig::optimization_distance=50;
@@ -159,12 +161,11 @@ namespace acsr{
     unsigned PlannerConfig::blossomM = 15;
     unsigned PlannerConfig::blossomN = 5;
 
-    //double Config::refA = 1.0005;
-    //double Config::refB = 1.05;
     int PlannerConfig::dominant_path_count = 2;
     double PlannerConfig::quality_factor = 50.0;
     double PlannerConfig::quality_decrease_factor = 1.1;
     double PlannerConfig::search_p = 0.5;
+    int PlannerConfig::nearest_electrode_count;
     double PlannerConfig::total_time = 600;
     bool PlannerConfig::show_node = true;
 }

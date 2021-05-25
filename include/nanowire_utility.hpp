@@ -9,6 +9,7 @@
 
 namespace acsr{
 
+    ///planner type
     enum PlannerType{
         e_SST = 0,
         e_iSST,
@@ -20,11 +21,11 @@ namespace acsr{
     std::default_random_engine _random_engine;
 
     /***
-         * generate a random integer between [_min,_max]
-         * @param _min
-         * @param _max
-         * @return
-         */
+     * generate a random integer between [_min,_max]
+     * @param _min
+     * @param _max
+     * @return
+     */
     int randomInteger(int _min, int _max) {
         std::uniform_int_distribution<int> distribution(_min, _max);
         return distribution(_random_engine);
@@ -42,6 +43,13 @@ namespace acsr{
         _random_engine.seed(seed);
     }
 
+    /***
+     * get heuristic for global route
+     * @param n_wires wire count
+     * @param state1 electrode positions
+     * @param state2 electrode positions
+     * @return
+     */
     int getHeuristic(int n_wires,const ElectordePositionType& state1,const ElectordePositionType& state2){
         int value = 0;
         for(auto i=0;i<n_wires;++i) {
@@ -51,6 +59,11 @@ namespace acsr{
         return value;
     }
 
+    /***
+     * convert planner type to string
+     * @param planner_type planner type
+     * @return planner string
+     */
     static std::string getPlannerString(PlannerType planner_type){
         switch (planner_type) {
             case PlannerType::e_SST:
@@ -61,9 +74,6 @@ namespace acsr{
                 return "Ref_iSST";
         }
     }
-
-
-
 
 }
 

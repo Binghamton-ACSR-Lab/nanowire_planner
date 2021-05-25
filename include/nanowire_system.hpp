@@ -313,9 +313,9 @@ namespace acsr {
         }
 
         /***
-     * override DynamicSystem function
-     * @return
-     */
+         * override DynamicSystem function
+         * @return
+         */
         virtual std::pair<std::vector<NodePtr>,NodePtr>
         getNearNodeByRadiusAndNearest(const Eigen::VectorXd &state, const KdTreeType  &tree,
                                       double radius)  {
@@ -327,8 +327,6 @@ namespace acsr {
                 if (distance(state, it->second->getState()) < radius) {
                     near_nodes.push_back(it->second);
                     ++it;
-                } else {
-                    //break;
                 }
             }
             return {near_nodes, nearest_node};

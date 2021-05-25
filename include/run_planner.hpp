@@ -108,7 +108,7 @@ namespace acsr {
                 std::cout<<"planner is running\n Number of Node: ";
                 auto nodes_count = planner->getNumberOfNode();
                 std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
-                std::cout<<"Solution Quality: "<<planner->getMaxCost()<<'\n';
+                std::cout<<"Solution Quality: "<<planner->getBestCost()<<'\n';
                 std::cout.flush();
                 auto stop = std::chrono::steady_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop-start);
@@ -152,10 +152,10 @@ namespace acsr {
                     std::cout<<"planner is running\n Number of Node: ";
                     auto nodes_count = planner->getNumberOfNode();
                     std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
-                    if(planner->getMaxCost()>1e6){
+                    if(planner->getBestCost()>1e6){
                         std::cout<<"no solution\n";
                     }else {
-                        std::cout << "Solution Quality: " << planner->getMaxCost() << '\n';
+                        std::cout << "Solution Quality: " << planner->getBestCost() << '\n';
                     }
                     std::cout.flush();
                     ///to update svg for node, this image can be view via http

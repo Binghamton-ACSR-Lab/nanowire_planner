@@ -12,7 +12,6 @@
 namespace acsr {
     namespace po = boost::program_options;
 
-
     /***
      * bi linear interpolation
      * @param q11 value at (x1,y1)
@@ -63,8 +62,7 @@ namespace acsr {
     class NanowireConfig {
     public:
 
-        static std::string type;
-        //static int dimension;
+        static std::string type; ///electrodes system type
         static double electrodes_space;///electrodes row space
         static double field_height;///electrodes column space
         static int electrodes_rows;///electrodes rows
@@ -181,7 +179,6 @@ namespace acsr {
     };
 
     std::string NanowireConfig::type;
-    //int NanowireConfig::dimension;
     double NanowireConfig::electrodes_space;///electrodes row space
     double NanowireConfig::field_height;///electrodes column space
     int NanowireConfig::electrodes_rows;///electrodes rows
@@ -193,7 +190,7 @@ namespace acsr {
 
     class EpField {
     private:
-        float ***value;
+        float ***value2d;
         float ****value3d;
         float *x_axis;
         float *y_axis;
@@ -206,13 +203,9 @@ namespace acsr {
         /***
          * interpolating for field
          * @param page
-         * @param x_axis
-         * @param y_axis
-         * @param column_count
-         * @param row_count
-         * @param x
-         * @param y
-         * @return
+         * @param x x-position
+         * @param y y-position
+         * @return value from 2d interpoation
          */
         float interp2d(int page, float x, float y) {
             int col = std::ceil((NanowireConfig::field_data_cols - 1) /
@@ -221,19 +214,27 @@ namespace acsr {
                                 ((NanowireConfig::electrodes_rows - 1) * NanowireConfig::electrodes_space) * y);
 
             if (row == 0 && col == 0) {
-                return value[page][0][0];
+                return value2d[page][0][0];
             }
             if (row == 0) {
-                return linearInterpolation(value[page][0][col - 1], value[page][0][col], x_axis[col - 1], x_axis[col],x);
+                return linearInterpolation(value2d[page][0][col - 1], value2d[page][0][col], x_axis[col - 1], x_axis[col],x);
             }
             if (col == 0) {
-                return linearInterpolation(value[page][row - 1][0], value[page][row - 1][0], y_axis[row - 1],x_axis[row], y);
+                return linearInterpolation(value2d[page][row - 1][0], value2d[page][row - 1][0], y_axis[row - 1],x_axis[row], y);
             }
-            return bilinearInterpolation(value[page][row - 1][col - 1], value[page][row][col - 1],
-                                         value[page][row - 1][col], value[page][row][col],
+            return bilinearInterpolation(value2d[page][row - 1][col - 1], value2d[page][row][col - 1],
+                                         value2d[page][row - 1][col], value2d[page][row][col],
                                          x_axis[col - 1], x_axis[col], y_axis[row - 1], y_axis[row], x, y);
         }
 
+        /***
+         * 3d interpolation
+         * @param page page 0-32
+         * @param x x-position
+         * @param y y-position
+         * @param z z-position
+         * @return value from interpolation
+         */
         float interp3d(int page, float x, float y,float z) {
             int l = std::ceil((NanowireConfig::field_data_rows - 1) / NanowireConfig::field_height * z);
             if (l == 0) {
@@ -245,6 +246,14 @@ namespace acsr {
             return linearInterpolation(v1,v2,z_axis[l-1],z_axis[l],z);
         }
 
+        /***
+         * intermedia function for 3d interpo
+         * @param page
+         * @param x x-position
+         * @param y y-position
+         * @param height z-height
+         * @return
+         */
         float interp2dWithHeight(int page, float x, float y,int height) {
             int col = std::ceil((NanowireConfig::field_data_cols - 1) /
                                 ((NanowireConfig::electrodes_columns - 1) * NanowireConfig::electrodes_space) * x);
@@ -263,13 +272,11 @@ namespace acsr {
 
 
     public:
-
         /***
-         * constructor
-         * @param config nanowire config pointer
+         * constructor, must specify dimension
+         * @param dimension field dimension
          */
         EpField(int dimension):_dimension(dimension) {
-            //read_file();
             auto data_columns = NanowireConfig::field_data_cols;
             auto data_rows = NanowireConfig::field_data_rows;
             auto pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
@@ -284,11 +291,11 @@ namespace acsr {
                             (data_rows - 1));
             }
             if(dimension==2){
-                value = new float **[2 * pages];
+                value2d = new float **[2 * pages];
                 for (int j = 0; j < 2 * pages; j++) {
-                    value[j] = new float *[data_rows];
+                    value2d[j] = new float *[data_rows];
                     for (int i = 0; i < data_rows; ++i)
-                        value[j][i] = new float [data_columns];
+                        value2d[j][i] = new float [data_columns];
                 }
             }else if(dimension==3){
                 auto data_layers = NanowireConfig::field_data_layers;
@@ -315,11 +322,11 @@ namespace acsr {
          */
         ~EpField() {
             int pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
-            if(_dimension==2 && value != nullptr){
+            if(_dimension==2 && value2d != nullptr){
                 for (int j = 0; j < 2 * pages; j++) {
                     for (int i = 0; i < NanowireConfig::field_data_rows; ++i)
-                        delete[] value[j][i];
-                    delete[] value[j];
+                        delete[] value2d[j][i];
+                    delete[] value2d[j];
                 }
             }
 
@@ -367,14 +374,14 @@ namespace acsr {
                     for (int i = 0; i < columns; i++) {
                         for (int j = 0; j < rows; j++) {
                             for (int k = 0; k < 2 * pages; k++)
-                                myfile >> value[k][j][i];
+                                myfile >> value2d[k][j][i];
                         }
                     }
                     std::ofstream fil;
                     fil.open(binary_file_name, std::ios::out | std::ios::binary);
                     for(auto i=0;i<2*pages;++i){
                         for(auto j=0;j<rows;++j)
-                            fil.write(reinterpret_cast<char*>(value[i][j]), columns*sizeof(float));
+                            fil.write(reinterpret_cast<char*>(value2d[i][j]), columns*sizeof(float));
                     }
                     fil.close();
                     return true;
@@ -413,7 +420,7 @@ namespace acsr {
                     if(fil.is_open()) {
                         for (auto i = 0; i < 2 * pages; ++i) {
                             for (auto j = 0; j < rows; ++j)
-                                fil.read(reinterpret_cast<char *>(value[i][j]), columns * sizeof(float));
+                                fil.read(reinterpret_cast<char *>(value2d[i][j]), columns * sizeof(float));
                         }
                     }
                     fil.close();
@@ -437,10 +444,10 @@ namespace acsr {
 
         /***
          * get electrical field at position (x,y)
-         * @param x
-         * @param y
-         * @param mat_E
-         * @param wire_count
+         * @param state position, (x1,y1,x2,y2,...,xn,yn)
+         * @param height a vector specify the height of each nanowire
+         * @param mat_E matrix storing field
+         * @param wire_count wire count
          */
         void getField(const Eigen::VectorXd &state, const Eigen::VectorXd &height, Eigen::MatrixXd &mat_E, int wire_count) {
             auto pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;

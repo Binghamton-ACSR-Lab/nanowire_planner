@@ -33,8 +33,6 @@ namespace acsr{
                                            return std::static_pointer_cast<TreeNode>(node1)->getCost() < std::static_pointer_cast<TreeNode>(node2)->getCost();
                                        });
             parent = std::static_pointer_cast<TreeNode>(*it);
-
-            ///this might happen if there's a branchUpdate process
             if(nullptr == parent)
                 return false;
             return true;

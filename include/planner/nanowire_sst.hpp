@@ -69,7 +69,7 @@ namespace acsr{
                                      const Eigen::VectorXd& control,
                                      double duration){
             auto target_node = tree_id==TreeId::forward?_goal:_root;
-            if(getMaxCost() <= parent->getCost() + duration + _dynamic_system->getHeuristic(state,target_node->getState()))
+            if(_best_cost <= parent->getCost() + duration + _dynamic_system->getHeuristic(state,target_node->getState()))
                 return nullptr;
 
             auto& map = tree_id==TreeId::forward?forward_prox_map:backward_prox_map;
@@ -107,19 +107,21 @@ namespace acsr{
             return new_node;
         }
 
-        void checkConnection(TreeNodePtr node){
+        /***
+         * check the distance of a new node to another tree
+         * @param node
+         */
+        void checkConnection(const TreeNodePtr& node){
             if(node == nullptr)return;
             TreeId another_treeid = (node->getTreeId()==TreeId::forward?TreeId::backward:TreeId::forward);
-            ///check solution update
             auto nearest_vec_node = getNearNodeByRadiusAndNearest(node->getState(),another_treeid,PlannerConfig::optimization_distance);
-
             ///there're nodes within optimization_distance
             if(!nearest_vec_node.first.empty()){
-                bool need_opt = false;
-                TreeNodePtr pair_node = nullptr;
                 for(auto& n : nearest_vec_node.first){
+                    auto pair_node = std::static_pointer_cast<TreeNode>(n);
+                    if(pair_node->getCost()+node->getCost() >= _best_cost)continue;
                     ///distance within goal radius, trying to update solution
-                    if(this->_dynamic_system->distance(n->getState(),node->getState())<=this->_goal_radius && std::static_pointer_cast<TreeNode>(n)->getCost()+node->getCost() < this->getMaxCost()){
+                    if(this->_dynamic_system->distance(pair_node->getState(),node->getState())<=this->_goal_radius){
                         if(node->getTreeId() == TreeId::forward) {
                             this->_best_goal.first = node;
                             this->_best_goal.second = std::static_pointer_cast<TreeNode>(n);
@@ -127,56 +129,37 @@ namespace acsr{
                             this->_best_goal.first = std::static_pointer_cast<TreeNode>(n);
                             this->_best_goal.second = node;
                         }
+                        updateBestCost();
                         notifySolutionUpdate();
                         branchBound(_root);
                         branchBound(_goal);
-                        notifySolutionUpdate();
                     }else{
-                        need_opt = true;
-                        pair_node = std::static_pointer_cast<TreeNode>(n);
+                        auto d = pair_node->getCost()+node->getCost()+_dynamic_system->getHeuristic(pair_node->getState(),node->getState());
+                        std::scoped_lock<std::mutex> lock(optimize_set_mutex);
+                        if(node->getTreeId()==TreeId::forward) {
+                            optimize_set[d] = std::make_pair(node,pair_node);
+                        }else{
+                            optimize_set[d] = std::make_pair(pair_node,node);
+                        }
                     }
                 }
 
-                ///put other nodes to optimize sets
-                if(need_opt){
-                    auto d = pair_node->getCost()+node->getCost()+_dynamic_system->getHeuristic(pair_node->getState(),node->getState());
-                    std::scoped_lock<std::mutex> lock(optimize_set_mutex);
-                    if(node->getTreeId()==TreeId::forward) {
-                        optimize_set[d] = std::make_pair(node,pair_node);
-                    }else{
-                        optimize_set[d] = std::make_pair(pair_node,node);
-                    }
-                }
             }
         }
 
-    public:
-        Eigen::VectorXd
-        forward(const Eigen::VectorXd &state, const Eigen::VectorXd &controls, const double duration) override {
-            auto step_length = _dynamic_system->getStepSize();
-            Eigen::VectorXd result;
-            double d;
-            _dynamic_system->forwardPropagateBySteps(state,controls,duration/step_length,result,d);
-            return result;
-        }
-
-    protected:
-
         /***
-         * add node to tree
+         * add node to kdtree
          * @param node
          */
         virtual void addPointToKdTree(TreeNodePtr node){
             if(node->getTreeId()==TreeId::forward){
                 std::scoped_lock<std::mutex> lock1(forward_tree_mutex);
                 forward_tree.insert({node->getState(),node});
-                //node->setTreeNodeState(TreeNodeState::in_tree);
                 this->_number_of_nodes.first+=1;
             }
             else if(node->getTreeId()==TreeId::backward){
                 std::scoped_lock<std::mutex> lock1(backward_tree_mutex);
                 backward_tree.insert({node->getState(),node});
-                //node->setTreeNodeState(TreeNodeState::in_tree);
                 this->_number_of_nodes.second+=1;
             }
         }
@@ -204,38 +187,6 @@ namespace acsr{
                 }
             }
         }
-
-        /***
-         * add witness to searching tree
-         * @param node
-         * @param tree_id
-         */
-         /*
-        virtual void addProxToContainer(ProxNodePtr node,TreeId tree_id){
-            if(tree_id==TreeId::forward){
-                std::scoped_lock<std::mutex> lock1(forward_prox_tree_mutex);
-                forward_prox_container.insert({node->getState(),node});
-            }
-            else if(tree_id==TreeId::backward){
-                std::scoped_lock<std::mutex> lock1(backward_prox_tree_mutex);
-                backward_prox_container.insert({node->getState(),node});
-            }
-        }*/
-
-        /***
-         * remove witness from searching container
-         * @param node
-         */
-         /*
-        virtual void removeNodeFromSet(std::weak_ptr<SSTTreeNode>& n){
-            if(n.expired())return;
-            auto node=n.lock();
-            int tree_id = node->getTreeId()==TreeId::forward?0:1;
-            if(node->getTreeNodeState() == TreeNodeState::in_optimize_set){
-                optimize_set[tree_id].erase(std::remove(begin(optimize_set[tree_id]), end(optimize_set[tree_id]), node), end(optimize_set[tree_id]));
-                node->setTreeNodeState(TreeNodeState::not_in_set);
-            }
-        }*/
 
         /***
          * get nearest n nodes
@@ -268,10 +219,10 @@ namespace acsr{
             std::pair<std::vector<NodePtr>,NodePtr> temp_node_vec;
             if(tree_id == TreeId::forward){
                 std::unique_lock<std::mutex> lock(forward_tree_mutex);
-                temp_node_vec = this->_dynamic_system->getNearNodeByRadiusAndNearest(state,forward_tree,radius);
+                temp_node_vec = _dynamic_system->getNearNodeByRadiusAndNearest(state,forward_tree,radius);
             }else if(tree_id == TreeId::backward){
                 std::unique_lock<std::mutex> lock(backward_tree_mutex);
-                temp_node_vec = this->_dynamic_system->getNearNodeByRadiusAndNearest(state,backward_tree,radius);
+                temp_node_vec = _dynamic_system->getNearNodeByRadiusAndNearest(state,backward_tree,radius);
             }
             return temp_node_vec;
         }
@@ -325,7 +276,7 @@ namespace acsr{
         virtual void branchBound(TreeNodePtr node){
             auto children = node->getChildren();
 
-            if(node->getCost() > this->getMaxCost()){
+            if(node->getCost() > _best_cost){
                 removeBranch(node);
             }else{
                 for(auto &n:children){
@@ -334,18 +285,23 @@ namespace acsr{
             }
         }
 
+        /***
+         * remove a branch
+         * @param node the branch root going to be removed
+         */
         virtual void removeBranch(TreeNodePtr node){
             auto children = node->getChildren();
             if(node->getParent()!=nullptr){
                 node->getParent()->removeChild(node);
             }
-            auto sst_node = std::dynamic_pointer_cast<SSTTreeNode>(node);
-            removePointFromKdTree(node);
+            auto sst_node = std::static_pointer_cast<SSTTreeNode>(node);
+            if(sst_node->isActive()) {
+                sst_node->setActive(false);
+                removePointFromKdTree(node);
+            }
             for(auto& n:children){
                 removeBranch(n);
             }
-
-
         }
 
     protected:
@@ -372,32 +328,30 @@ namespace acsr{
          * constructor
          * @param dynamic_system
          */
-        SST(const std::shared_ptr<NanowireSystem>& dynamic_system):
+        explicit SST(const std::shared_ptr<NanowireSystem>& dynamic_system):
             Planner(dynamic_system),
             forward_tree(this->_dynamic_system->getStateDimension()),
             backward_tree(this->_dynamic_system->getStateDimension()){
-
         }
 
         /***
          * destructor
          */
         ~SST() override{
-            //forward_prox_container.clear();
-            //backward_prox_container.clear();
             forward_tree.clear();
             backward_tree.clear();
             optimize_set.clear();
-            //optimize_set[1].clear();
+            forward_prox_map.clear();
+            backward_prox_map.clear();
+            _root = nullptr;
+            _goal = nullptr;
         }
 
         /***
          * override setup
          */
         void setup() override{
-
             _run_flag = true;
-
             ///initial start and target states,this is necessary since the dimension may not consistent.
             Eigen::VectorXd temp_init_state(this->_dynamic_system->getStateDimension());
             Eigen::VectorXd temp_target_state(this->_dynamic_system->getStateDimension());
@@ -413,36 +367,15 @@ namespace acsr{
             ///init root and goal
             _root = std::make_shared<SSTTreeNode>(TreeId::forward, this->_init_state);
             _root->setEdge(TreeEdge(Eigen::VectorXd(this->_dynamic_system->getControlDimension()),0.0));
+            _root->setActive(true);
             addPointToKdTree(_root);
+            forward_prox_map[_dynamic_system->getGrid(_init_state)]= _root;
+
             _goal = std::make_shared<SSTTreeNode>(TreeId::backward, this->_target_state);
             _goal->setEdge(TreeEdge(Eigen::VectorXd(this->_dynamic_system->getControlDimension()),0.0));
-            addPointToKdTree(_goal);
-
-            //_root->setTreeNodeState(TreeNodeState::in_tree);
-            //_goal->setTreeNodeState(TreeNodeState::in_tree);
-            ///initial witness for root and goal
-            //auto root_prox = std::make_shared<ProxNode>(this->_init_state);
-            //_root->setProxNode(root_prox);
-            _root->setActive(true);
-            //addProxToContainer(root_prox,TreeId::forward);
-            forward_prox_map[_dynamic_system->getGrid(_init_state)]= _root;
-            //root_prox->setMonitorNode(_root);
-
-            //auto goal_prox = std::make_shared<ProxNode>(this->_target_state);
-            //_goal->setProxNode(goal_prox);
             _goal->setActive(true);
-            //addProxToContainer(goal_prox,TreeId::backward);
-            //goal_prox->setMonitorNode(_goal);
+            addPointToKdTree(_goal);
             backward_prox_map[_dynamic_system->getGrid(_target_state)]= _goal;
-
-
-            ///notify observer
-            /*
-            for(auto observer: this->planner_start_observers){
-                observer->onPlannerStart("SST",this->dynamic_system->getRobotCount(),this->init_state,this->target_state,Config::bidirection,Config::optimization,Config::stopping_type,
-                                         Config::stopping_check,Config::goal_radius,Config::integration_step,Config::min_time_steps,Config::max_time_steps,
-                                         Config::sst_delta_near,Config::sst_delta_drain,Config::optimization_distance,0,0,0,0);
-            }*/
         }
 
         /***
@@ -452,20 +385,12 @@ namespace acsr{
             auto temp_state = this->_dynamic_system->randomState();
             auto temp_control = this->_dynamic_system->randomControl();
             auto nearest_vec_node = getNearNodeByRadiusAndNearest(temp_state,TreeId::forward,PlannerConfig::sst_delta_near);
-            auto parent = std::static_pointer_cast<SSTTreeNode>(nearest_vec_node.second);
+            auto parent = nearest_vec_node.second;
             if(!nearest_vec_node.first.empty()) {
-                std::vector<SSTTreeNodePtr> nearest_vec(nearest_vec_node.first.size());
-
-                ///cast to SST node
-                std::transform(nearest_vec_node.first.begin(), nearest_vec_node.first.end(), nearest_vec.begin(),
-                               [](const std::shared_ptr<Node> &node) {
-                                   return std::static_pointer_cast<SSTTreeNode>(node);
-                               });
                 ///select the node with minimum cost
-                parent = *std::min_element(nearest_vec.begin(), nearest_vec.end(),
-                                           [](const SSTTreeNodePtr &node1,
-                                              const SSTTreeNodePtr &node2) {
-                                               return node1->getCost() < node2->getCost();
+                parent = *std::min_element(nearest_vec_node.first.begin(), nearest_vec_node.first.end(),
+                                           [](const NodePtr &node1, const NodePtr &node2) {
+                                               return std::static_pointer_cast<TreeNode>(node1)->getCost() < std::static_pointer_cast<TreeNode>(node2)->getCost();
                                            });
             }
 
@@ -473,7 +398,7 @@ namespace acsr{
             Eigen::VectorXd result;
             double duration;
             if(forwardPropagate(parent->getState(),temp_control,steps,result,duration)){
-                auto new_node = addToTree(TreeId::forward,parent,result,temp_control,duration);
+                auto new_node = addToTree(TreeId::forward,std::static_pointer_cast<TreeNode>(parent),result,temp_control,duration);
                 checkConnection(new_node);
             }
         }
@@ -482,7 +407,7 @@ namespace acsr{
          * override backward step
          */
         void backwardStep() override{
-            if(!this->_is_bi_tree_planner)
+            if(!_is_bi_tree_planner)
                 return;
             auto temp_state = this->_dynamic_system->randomState();
             auto temp_control = this->_dynamic_system->randomControl();
@@ -490,23 +415,11 @@ namespace acsr{
             //auto parent = std::static_pointer_cast<SSTTreeNode>(nearest_vec_node.second);
             auto parent = nearest_vec_node.second;
             if(!nearest_vec_node.first.empty()) {
-                //std::vector<SSTTreeNodePtr> nearest_vec(nearest_vec_node.first.size());
-
-                ///cast to SST node
-                /*
-                std::transform(nearest_vec_node.first.begin(), nearest_vec_node.first.end(), nearest_vec.begin(),
-                               [](const NodePtr &node) {
-                                   return std::static_pointer_cast<SSTTreeNode>(node);
-                               });*/
-
                 parent = *std::min_element(nearest_vec_node.first.begin(), nearest_vec_node.first.end(),
-                                           [](const NodePtr &node1,
-                                              const NodePtr &node2) {
+                                           [](const NodePtr &node1,const NodePtr &node2) {
                                                return std::static_pointer_cast<TreeNode>(node1)->getCost() < std::static_pointer_cast<TreeNode>(node2)->getCost();
                                            });
-
             }
-
             auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
             Eigen::VectorXd result;
             double duration;
@@ -523,7 +436,6 @@ namespace acsr{
             if(!_run_flag)return;
             if(!this->_is_optimized_connect)
                 return;
-
             if(this->optimize_set.empty())
                 return;
             TreeNodePtr explore_node = nullptr;
@@ -534,7 +446,6 @@ namespace acsr{
             auto it = this->optimize_set.begin();
             while(it!=this->optimize_set.end()){
                 if(!_run_flag)return;
-
                 if(it->second.first.expired() || it->second.second.expired()){
                     it = optimize_set.erase(it);
                     continue;
@@ -566,7 +477,7 @@ namespace acsr{
                 || !std::static_pointer_cast<SSTTreeNode>(explore_node)->isActive()
                 || target==nullptr
                 || !std::static_pointer_cast<SSTTreeNode>(target)->isActive()
-                || total_cost > this->getMaxCost()){
+                || total_cost > _best_cost){
                 return;
             }
 
@@ -583,9 +494,6 @@ namespace acsr{
             if(explore_node == nullptr || target == nullptr)
                 return;
 
-
-            //explore_node->setTreeNodeState(TreeNodeState::not_in_set);
-
             if(!optimized){
                 return;
             }
@@ -594,7 +502,7 @@ namespace acsr{
 
             //auto total_duration = std::accumulate(vec_duration.begin(),vec_duration.end(),0.0);
             auto total_duration = vec_duration.sum();
-            if(explore_node->getCost() + target->getCost() + total_duration < this->getMaxCost()){
+            if(explore_node->getCost() + target->getCost() + total_duration < _best_cost){
 
                 this->_best_goal.first = explore_node;
                 this->_best_goal.second = target;
@@ -612,10 +520,27 @@ namespace acsr{
                     connect_durations.push_back(vec_duration(i));
                 }
                 _planner_connection = std::make_shared<PlannerConnection>(this->_best_goal,connect_states,connect_controls,connect_durations);
+                updateBestCost();
                 branchBound(this->_root);
                 branchBound(this->_goal);
                 notifySolutionUpdate();
             }
+        }
+
+        /***
+         * given initial state, control and durations to take forward steps
+         * @param state start state
+         * @param controls control
+         * @param duration duration
+         * @return final state
+         */
+        Eigen::VectorXd
+        forward(const Eigen::VectorXd &state, const Eigen::VectorXd &controls, const double duration) override {
+            auto step_length = _dynamic_system->getStepSize();
+            Eigen::VectorXd result;
+            double d;
+            _dynamic_system->forwardPropagateBySteps(state,controls,duration/step_length,result,d);
+            return result;
         }
     };
 }
