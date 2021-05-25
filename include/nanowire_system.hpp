@@ -23,23 +23,42 @@ namespace acsr {
         ReferencePath()=default;
         virtual ~ReferencePath()=default;
 
+        /***
+         * read reference trajectory file
+         * @param filename file name
+         * @return
+         */
         bool readFile(std::string filename){
             if(!boost::filesystem::exists(filename)){
                 std::cout<<filename<<" does not exist\n";
                 return false;
             }
             _path.read(filename.c_str());
-            _path.print();
+            //_path.print();
             return true;
         }
 
+        /***
+         * get path
+         * @return path
+         */
         const VariablesGrid &getStates() const{
             return _path;
         }
 
+        /***
+         * get state at time
+         * @param time time
+         * @return state
+         */
         Eigen::MatrixXd getState(double time){
             return _path.linearInterpolation(time);
         }
+
+        /***
+         * get total cost time
+         * @return time
+         */
         double getMaxTime(){
             return _path.getLastTime();
         }
@@ -372,22 +391,16 @@ namespace acsr {
                      Eigen::MatrixXd &vec_state,
                      Eigen::MatrixXd &vec_control,
                      Eigen::VectorXd &vec_duration)  {
-            //auto nanowire_count = _nanowire_config->getNanowireCount();
+
             ACADO::DVector x0(start);
             ACADO::DVector xt(target);
 
-            //std::cout<<x0<<std::endl<<xt<<std::endl;
 
             auto states = std::make_shared<ACADO::VariablesGrid>();//=new VariablesGrid();
             auto controls = std::make_shared<ACADO::VariablesGrid>();//=new VariablesGrid();
 
             states->addVector(x0, 0);
 
-
-            auto max_theta_pt = std::max_element(_mat_theta.data(), _mat_theta.data() + 2 * _n_wire,
-                                                 [](double &aa, double &bb) {
-                                                     return (std::abs(aa) < std::abs(bb));
-                                                 });
 
 
             if (!optimize(x0, xt, states, controls)) {
