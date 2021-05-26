@@ -466,7 +466,7 @@ namespace acsr {
             ///set parameters for nanowire system
             Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),_n_wires);
             Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*_n_wires);
-            nanowire_system->setParams(_field_dimension,zeta_vec,height_vec);
+            nanowire_system->init(zeta_vec, height_vec);
             nanowire_system->reset();
 
             ///create a new planner
@@ -527,7 +527,7 @@ namespace acsr {
             ///reset nanowire parameters
             Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),_n_wires);
             Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*_n_wires);
-            nanowire_system->setParams(_field_dimension,zeta_vec,height_vec);
+            nanowire_system->init(zeta_vec, height_vec);
             nanowire_system->reset();
 
             ///create new planner

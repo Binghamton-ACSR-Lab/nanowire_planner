@@ -199,10 +199,23 @@ namespace acsr{
             std::vector<NodePtr> temp_vec;
             if(tree_id == TreeId::forward){
                 std::unique_lock<std::mutex> lock(forward_tree_mutex);
-                temp_vec =  _dynamic_system->getNearNodeByCount(state,forward_tree,count);
+                //temp_vec =  _dynamic_system->getNearNodeByCount(state,forward_tree,count);
+                auto it = spatial::quadrance_neighbor_begin(forward_tree, state);
+                auto max_count = std::min(int(forward_tree.size()), count);
+                temp_vec.resize(max_count);
+                for (auto i = 0; i < max_count; ++i) {
+                    temp_vec[i] = it->second;
+                    ++it;
+                }
             }else if(tree_id == TreeId::backward){
                 std::unique_lock<std::mutex> lock(backward_tree_mutex);
-                temp_vec = _dynamic_system->getNearNodeByCount(state,backward_tree,count);
+                auto it = spatial::quadrance_neighbor_begin(backward_tree, state);
+                auto max_count = std::min(int(backward_tree.size()), count);
+                temp_vec.resize(max_count);
+                for (auto i = 0; i < max_count; ++i) {
+                    temp_vec[i] = it->second;
+                    ++it;
+                }
             }
             return temp_vec;
         }
