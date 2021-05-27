@@ -2,9 +2,10 @@
 #include "run_planner.hpp"
 #include "global_path.hpp"
 using namespace acsr;
+BOOST_GEOMETRY_REGISTER_EIGEN_MATRIX_CS(cs::cartesian)
 int main() {
 
-    RunPlanner run_planner;
+    RunPlanner<3> run_planner;
     run_planner.init();
     run_planner.run();
     //run_planner.run();

@@ -27,7 +27,10 @@ namespace acsr {
     using namespace brynet::net;
     using namespace brynet::base;
 
-    class TcpServer : public MessageDisplayer,public SolutionUpdateObserver{
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    class TcpServer : public MessageDisplayer,public SolutionUpdateObserver<STATE_DIMENSION,CONTROL_DIMENSION>{
+        using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
+        using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
     private:
         std::atomic_llong TotalSendLen = ATOMIC_VAR_INIT(0);
         std::atomic_llong TotalRecvLen = ATOMIC_VAR_INIT(0);
@@ -160,12 +163,12 @@ namespace acsr {
 
         }
 
-        void onSolutionUpdate(const std::vector<Eigen::VectorXd> &forward_states,
-                              const std::vector<Eigen::VectorXd> &reverse_states,
-                              const std::vector<Eigen::VectorXd> &connect_states,
-                              const std::vector<Eigen::VectorXd> &forward_control,
-                              const std::vector<Eigen::VectorXd> &reverse_control,
-                              const std::vector<Eigen::VectorXd> &connect_control,
+        void onSolutionUpdate(const std::vector<StateType> &forward_states,
+                              const std::vector<StateType> &reverse_states,
+                              const std::vector<StateType> &connect_states,
+                              const std::vector<ControlType> &forward_control,
+                              const std::vector<ControlType> &reverse_control,
+                              const std::vector<ControlType> &connect_control,
                               const std::vector<double> &forward_durations,
                               const std::vector<double> &reverse_durations,
                               const std::vector<double> &connect_durations,

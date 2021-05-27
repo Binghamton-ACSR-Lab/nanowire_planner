@@ -6,11 +6,11 @@
 #define NANOWIREPLANNER_TREE_NODE_HPP
 
 #include <list>
-#include <spatial/spatial.hpp>
-#include <spatial/point_multiset.hpp>
-#include <spatial/point_multimap.hpp>
-#include <spatial/neighbor_iterator.hpp>
-#include <spatial/metric.hpp>
+//#include <spatial/spatial.hpp>
+//#include <spatial/point_multiset.hpp>
+//#include <spatial/point_multimap.hpp>
+//#include <spatial/neighbor_iterator.hpp>
+//#include <spatial/metric.hpp>
 #include <unordered_map>
 
 namespace acsr {
@@ -33,21 +33,36 @@ namespace acsr {
     };
 */
 
-    using TreeEdge =std::pair<Eigen::VectorXd,double>;
+    template <int CONTROL_DIMENSION>
+    using TreeEdge =std::pair<Eigen::Matrix<double,CONTROL_DIMENSION,1>,double>;
 
-    class ProxNode;
+    //template <int STATE_DIMENSION>
+    //class ProxNode;
+
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class SSTTreeNode;
+
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class TreeNode;
+
+    template <int STATE_DIMENSION>
     class Node;
-    using NodePtr = std::shared_ptr<Node>;
-    using TreeNodePtr = std::shared_ptr <TreeNode>;
-    using SSTTreeNodePtr = std::shared_ptr <SSTTreeNode>;
-    using ProxNodePtr = std::shared_ptr <ProxNode>;
 
+    /*
+    template <int STATE_DIMENSION>
+    using NodePtr = std::shared_ptr<Node<STATE_DIMENSION>>;
 
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
+
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    using SSTTreeNodePtr = std::shared_ptr <SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;*/
+    //using ProxNodePtr = std::shared_ptr <ProxNode>;
+
+    template <int STATE_DIMENSION>
     class Node{
     protected:
-        Eigen::VectorXd _state;
+        Eigen::Matrix<double,STATE_DIMENSION,1> _state;
     public:
         /***
          * delete defaut constructor
@@ -58,7 +73,7 @@ namespace acsr {
          * costructor with an inital state
          * @param _state
          */
-        explicit Node(const Eigen::VectorXd& state):_state(state){
+        explicit Node(const Eigen::Matrix<double,STATE_DIMENSION,1>& state):_state(state){
         }
 
         /***
@@ -100,18 +115,19 @@ namespace acsr {
          * get the state
          * @return
          */
-        virtual Eigen::VectorXd getState() const{
+        virtual Eigen::Matrix<double,STATE_DIMENSION,1> getState() const{
             return _state;
         }
 
     };
 
-    class TreeNode: public Node {
-
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    class TreeNode: public Node<STATE_DIMENSION> {
+        using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
     protected:
         std::weak_ptr <TreeNode> _parent;
         std::list<TreeNodePtr> _children;
-        TreeEdge  _edge;
+        TreeEdge<CONTROL_DIMENSION>  _edge;
         double _cost;
         TreeId _tree_id;
         //TreeNodeState _tree_node_state;
@@ -139,7 +155,7 @@ namespace acsr {
          * @param id: tree id
          * @param pt: node state
          */
-        explicit TreeNode(TreeId id, const Eigen::VectorXd &pt):Node(pt),_tree_id(id),_cost(0.0) {
+        explicit TreeNode(TreeId id, const Eigen::Matrix<double,STATE_DIMENSION,1> &pt):Node<STATE_DIMENSION>(pt),_tree_id(id),_cost(0.0) {
 
         }
 
@@ -243,7 +259,7 @@ namespace acsr {
          * set tree edge
          * @param _edge
          */
-        void setEdge(const TreeEdge &edge) {
+        void setEdge(const TreeEdge<CONTROL_DIMENSION> &edge) {
             _edge = edge;
         }
 
@@ -251,7 +267,7 @@ namespace acsr {
          * get the control of the edge
          * @return
          */
-        Eigen::VectorXd getEdgeControl() const {
+        Eigen::Matrix<double,CONTROL_DIMENSION,1> getEdgeControl() const {
             return _edge.first;
         }
 
@@ -263,45 +279,15 @@ namespace acsr {
             return _edge.second;
         }
 
-        bool operator==(const TreeNode &node) const {
-            return _state == node._state && _edge == node._edge && _tree_id == node._tree_id &&
+        bool operator==(const TreeNode<STATE_DIMENSION,CONTROL_DIMENSION> &node) const {
+            return this->_state == node._state && _edge == node._edge && _tree_id == node._tree_id &&
                    _cost == node._cost;
         }
 
     };
 
-    /*
-    namespace std {
-        class hash<TreeNode> {
-        public:
-            size_t operator()(const TreeNode &node) const {
-                auto f = std::hash<Te>{};
-                auto state = node.getState();
-                std::size_t h = 0;
-                for (auto i = 0; state.size(); ++i) {
-                    h += f(state[i]);
-                }
-                h += std::hash<Te>{}(node.getCost());
-                return h;
-            }
-        };
-    }
-
-    template<typename T, typename Te, typename Tc>
-    struct TreeNodeHash {
-        std::size_t operator()(const std::shared_ptr<TreeNode> &node) {
-            auto state = node->getState();
-            std::size_t h = 0;
-            for (auto i = 0; state.size(); ++i) {
-                h += std::hash<double>{}(state[i]);
-            }
-            h += std::hash<double>{}(node->getCost());
-            return h;
-        }
-
-    };
-*/
-    class SSTTreeNode : public TreeNode{
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    class SSTTreeNode : public TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>{
 
     protected:
         //ProxNodePtr _prox_node;
@@ -318,7 +304,7 @@ namespace acsr {
          * @param id
          * @param pt
          */
-        SSTTreeNode(TreeId id,const Eigen::VectorXd& pt): TreeNode(id,pt){
+        SSTTreeNode(TreeId id,const Eigen::Matrix<double,STATE_DIMENSION,1>& pt): TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>(id,pt){
 
         }
 
@@ -360,7 +346,7 @@ namespace acsr {
         ~SSTTreeNode() override =default;
     };
 
-    using KdTreeType = spatial::point_multimap<0, Eigen::VectorXd, std::shared_ptr<Node>>;
+    //using KdTreeType = spatial::point_multimap<0, Eigen::VectorXd, std::shared_ptr<Node>>;
 
 }
 

@@ -11,7 +11,10 @@ namespace acsr {
     /***
      * solution updated observer
      */
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class SolutionUpdateObserver {
+        using STATE_TYPE = Eigen::Matrix<double,STATE_DIMENSION,1>;
+        using CONTROL_TYPE = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
     public:
         SolutionUpdateObserver() = default;
 
@@ -32,12 +35,12 @@ namespace acsr {
          * @param connect_durations
          */
         virtual void onSolutionUpdate(
-                const std::vector<Eigen::VectorXd> &forward_states,
-                const std::vector<Eigen::VectorXd> &reverse_states,
-                const std::vector<Eigen::VectorXd> &connect_states,
-                const std::vector<Eigen::VectorXd> &forward_control,
-                const std::vector<Eigen::VectorXd> &reverse_control,
-                const std::vector<Eigen::VectorXd> &connect_control,
+                const std::vector<STATE_TYPE> &forward_states,
+                const std::vector<STATE_TYPE> &reverse_states,
+                const std::vector<STATE_TYPE> &connect_states,
+                const std::vector<CONTROL_TYPE> &forward_control,
+                const std::vector<CONTROL_TYPE> &reverse_control,
+                const std::vector<CONTROL_TYPE> &connect_control,
                 const std::vector<double> &forward_durations,
                 const std::vector<double> &reverse_durations,
                 const std::vector<double> &connect_durations,const std::string& solution_string) = 0;
@@ -49,8 +52,11 @@ namespace acsr {
     /***
      * planner start observer
      */
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class PlannerStartObserver
     {
+        using STATE_TYPE = Eigen::Matrix<double,STATE_DIMENSION,1>;
+        using CONTROL_TYPE = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
     public:
         PlannerStartObserver()=default;
         PlannerStartObserver(const PlannerStartObserver&) = delete;
@@ -81,8 +87,8 @@ namespace acsr {
         virtual void onPlannerStart(
                 std::string type,
                 int robot_count,
-                const Eigen::VectorXd& init_state,
-                const Eigen::VectorXd& target_state,
+                const STATE_TYPE& init_state,
+                const STATE_TYPE& target_state,
                 const ACADO::VariablesGrid& reference_path,
                 bool bidirectional,
                 bool optimization,
@@ -107,15 +113,18 @@ namespace acsr {
     /***
      * node added observer
      */
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class NodeAddedObserver
     {
+        using STATE_TYPE = Eigen::Matrix<double,STATE_DIMENSION,1>;
+        using CONTROL_TYPE = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
     public:
         NodeAddedObserver()=default;
         NodeAddedObserver(const NodeAddedObserver&) = delete;
         NodeAddedObserver& operator=(const NodeAddedObserver&) = delete;
 
 
-        virtual void onNodeAdded(const Eigen::VectorXd& state,TreeId id) = 0;
+        virtual void onNodeAdded(const STATE_TYPE& state,TreeId id) = 0;
         virtual ~NodeAddedObserver()=default;
     };
 

@@ -16,7 +16,12 @@ namespace acsr {
     /***
      * struct to storing connecting segment information
      */
+     template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     struct PlannerConnection{
+        using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
+        using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
+        using NodePtr = std::shared_ptr<Node<STATE_DIMENSION>>;
+        using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
     public:
 
         /***
@@ -32,8 +37,8 @@ namespace acsr {
          * @param durations a vector to store intermedia duration from beginning states to target states
          */
         PlannerConnection(std::pair<TreeNodePtr,TreeNodePtr> end_states,
-                          std::vector<Eigen::VectorXd>& state,
-                          std::vector<Eigen::VectorXd>& controls,
+                          std::vector<StateType>& state,
+                          std::vector<ControlType>& controls,
                           std::vector<double>& durations):
                 _states(std::move(state)),_controls(std::move(controls)),_durations(std::move(durations)),_end_states(std::move(end_states))
         {
@@ -55,8 +60,8 @@ namespace acsr {
             return std::accumulate(_durations.begin(),_durations.end(),0.0);
         }
 
-        std::vector<Eigen::VectorXd> _states{};
-        std::vector<Eigen::VectorXd> _controls{};
+        std::vector<StateType> _states{};
+        std::vector<ControlType> _controls{};
         std::vector<double> _durations;
         std::pair<TreeNodePtr,TreeNodePtr> _end_states;
     };
@@ -64,14 +69,19 @@ namespace acsr {
     /***
      * abstract class for planner
      */
+     template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class Planner {
-
+        using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
+        using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;;
+        using NodePtr = std::shared_ptr<Node<STATE_DIMENSION>>;
+        using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
     protected:
-        std::shared_ptr<NanowireSystem> _dynamic_system; ///nanowire system
-        std::shared_ptr<PlannerConnection> _planner_connection;/// connecting segment
+        //const int _state_dimension;
+        std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>> _dynamic_system; ///nanowire system
+        std::shared_ptr<PlannerConnection<STATE_DIMENSION,CONTROL_DIMENSION>> _planner_connection;/// connecting segment
 
-        Eigen::VectorXd _init_state;///start state
-        Eigen::VectorXd _target_state;///target state
+        StateType _init_state;///start state
+        StateType _target_state;///target state
 
         double _goal_radius;///goal radius
 
@@ -82,9 +92,9 @@ namespace acsr {
         bool _is_optimized_connect = false;///flag to indicate adopting BVP to connect two trees
 
         ///observers
-        std::vector<std::shared_ptr<SolutionUpdateObserver>> solution_update_observers;
-        std::vector<std::shared_ptr<PlannerStartObserver>> planner_start_observers;
-        std::vector<std::shared_ptr<NodeAddedObserver>> node_added_observers;
+        std::vector<std::shared_ptr<SolutionUpdateObserver<STATE_DIMENSION,CONTROL_DIMENSION>>> solution_update_observers;
+        std::vector<std::shared_ptr<PlannerStartObserver<STATE_DIMENSION,CONTROL_DIMENSION>>> planner_start_observers;
+        std::vector<std::shared_ptr<NodeAddedObserver<STATE_DIMENSION,CONTROL_DIMENSION>>> node_added_observers;
 
         /// a flag to indicate the planner is stopped. This flag is used to terminate long time process
         std::atomic_bool _run_flag;
@@ -119,7 +129,10 @@ namespace acsr {
          * construct
          * @param system
          */
-        explicit Planner(std::shared_ptr<NanowireSystem> system):_dynamic_system(system), _run_flag(false), _goal_radius(0.0) {
+        explicit Planner(std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>> system):_dynamic_system(system),
+            _run_flag(false),
+            _goal_radius(0.0){
+
         }
 
         virtual ~Planner() = default;
@@ -171,14 +184,14 @@ namespace acsr {
          * get start state
          * @return
          */
-        virtual Eigen::VectorXd getStartState() const {
+        virtual StateType getStartState() const {
             return _init_state;
         }
 
         /***
          * set start state
          */
-        virtual void setStartState(const Eigen::VectorXd &init_state) {
+        virtual void setStartState(const StateType &init_state) {
             _init_state = init_state;
         }
 
@@ -186,14 +199,14 @@ namespace acsr {
          * get target state
          * @return
          */
-        virtual Eigen::VectorXd getTargetState() const {
+        virtual StateType getTargetState() const {
             return _target_state;
         }
 
         /***
          * set target state
          */
-        virtual void setTargetState(const Eigen::VectorXd &target_state) {
+        virtual void setTargetState(const StateType &target_state) {
             _target_state = target_state;
         }
 
@@ -227,7 +240,7 @@ namespace acsr {
             _is_optimized_connect = optimized_connect;
         }
 
-        virtual Eigen::VectorXd forward(const Eigen::VectorXd& state,const Eigen::VectorXd& controls,const double duration) = 0;
+        virtual StateType forward(const StateType& state,const ControlType& controls,double duration) = 0;
 
 
 
@@ -236,7 +249,7 @@ namespace acsr {
          * @param observer inherits from SolutionUpdateObserver
          */
 
-       virtual void registerSolutionUpdateObserver(const std::shared_ptr<SolutionUpdateObserver>& observer){
+       virtual void registerSolutionUpdateObserver(const std::shared_ptr<SolutionUpdateObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
            this->solution_update_observers.push_back(observer);
        }
 
@@ -245,7 +258,7 @@ namespace acsr {
          * @param observer inherits from SolutionUpdateObserver
          */
 
-       virtual void unregisterSolutionUpdateObserver(const std::shared_ptr<SolutionUpdateObserver>& observer){
+       virtual void unregisterSolutionUpdateObserver(const std::shared_ptr<SolutionUpdateObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
            this->solution_update_observers.erase(std::find(solution_update_observers.begin(),solution_update_observers.end(),observer));
        }
 
@@ -254,7 +267,7 @@ namespace acsr {
           * @param observer inherits from NodeAddedObserver
           */
 
-        virtual void registerNodeAddedObserver(const std::shared_ptr<NodeAddedObserver>& observer){
+        virtual void registerNodeAddedObserver(const std::shared_ptr<NodeAddedObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
             node_added_observers.push_back(observer);
         }
 
@@ -263,7 +276,7 @@ namespace acsr {
          * @param observer inherits from NodeAddedObserver
          */
 
-        virtual void unregisterSolutionUpdateObserver(const std::shared_ptr<NodeAddedObserver>& observer){
+        virtual void unregisterSolutionUpdateObserver(const std::shared_ptr<NodeAddedObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
             node_added_observers.erase(std::find(node_added_observers.begin(),node_added_observers.end(),observer));
         }
 
@@ -274,7 +287,7 @@ namespace acsr {
          * @param observer inherits from PlannerStartObserver
          */
 
-       virtual void registerPlannerStartObserver(const std::shared_ptr<PlannerStartObserver>& observer){
+       virtual void registerPlannerStartObserver(const std::shared_ptr<PlannerStartObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
            this->planner_start_observers.push_back(observer);
        }
 
@@ -283,7 +296,7 @@ namespace acsr {
          * @param observer inherits from PlannerStartObserver
          */
 
-       virtual void unregisterPlannerStartObserver(const std::shared_ptr<PlannerStartObserver>& observer){
+       virtual void unregisterPlannerStartObserver(const std::shared_ptr<PlannerStartObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
            this->planner_start_observers.erase(std::find(planner_start_observers.begin(),planner_start_observers.end(),observer));
        }
 
@@ -299,12 +312,12 @@ namespace acsr {
          * @param backward_durations
          * @param connect_durations
          */
-        void getSolutionVectors(std::vector<Eigen::VectorXd> &forward_states,
-                                std::vector<Eigen::VectorXd> &backward_states,
-                                std::vector<Eigen::VectorXd> &connect_states,
-                                std::vector<Eigen::VectorXd> &forward_control,
-                                std::vector<Eigen::VectorXd> &backward_control,
-                                std::vector<Eigen::VectorXd> &connect_control,
+        void getSolutionVectors(std::vector<StateType> &forward_states,
+                                std::vector<StateType> &backward_states,
+                                std::vector<StateType> &connect_states,
+                                std::vector<ControlType> &forward_control,
+                                std::vector<ControlType> &backward_control,
+                                std::vector<ControlType> &connect_control,
                                 std::vector<double> &forward_durations,
                                 std::vector<double> &backward_durations,
                                 std::vector<double> &connect_durations,
@@ -332,7 +345,7 @@ namespace acsr {
 
             node = _best_goal.second;
             backward_durations.push_back(0);
-            backward_control.push_back(Eigen::VectorXd(_dynamic_system->getControlDimension()));
+            backward_control.push_back(ControlType(_dynamic_system->getControlDimension()));
             while (node) {
                 backward_states.push_back(node->getState());
                 backward_control.push_back(node->getEdgeControl());
@@ -351,9 +364,9 @@ namespace acsr {
             std::reverse(forward_control.begin(), forward_control.end());
             std::reverse(forward_durations.begin(), forward_durations.end());
 
-            auto maxDistance = [this](const Eigen::VectorXd& s1,const Eigen::VectorXd& s2){
+            auto maxDistance = [this](const StateType & s1,const StateType& s2){
                 double t1 = 0.0;
-                for(auto i=0;i<_dynamic_system->getRobotCount();++i){
+                for(auto i=0;i<STATE_DIMENSION/2;++i){
                     t1 = std::max( (s1.segment(2*i,2)-s2.segment(2*i,2)).norm(),t1);
                 }
                 return t1;
@@ -484,7 +497,7 @@ namespace acsr {
            }
        }
 
-        virtual void notifyNodeAdded(const Eigen::VectorXd& state,TreeId id) {
+        virtual void notifyNodeAdded(const StateType & state,TreeId id) {
            for(auto observer: node_added_observers){
                observer->onNodeAdded(state,id);
            }
@@ -494,12 +507,12 @@ namespace acsr {
           * notify solution update observers. This function should be manually called when a solution is updated
           */
         virtual void notifySolutionUpdate() {
-            std::vector<Eigen::VectorXd> forward_state;
-            std::vector<Eigen::VectorXd> reverse_state;
-            std::vector<Eigen::VectorXd> connect_state;
-            std::vector<Eigen::VectorXd> forward_control;
-            std::vector<Eigen::VectorXd> reverse_control;
-            std::vector<Eigen::VectorXd> connect_control;
+            std::vector<StateType> forward_state;
+            std::vector<StateType> reverse_state;
+            std::vector<StateType> connect_state;
+            std::vector<ControlType> forward_control;
+            std::vector<ControlType> reverse_control;
+            std::vector<ControlType> connect_control;
             std::vector<double> forward_durations;
             std::vector<double> reverse_durations;
             std::vector<double> connect_durations;

@@ -8,7 +8,30 @@
 
 namespace acsr{
 
-    class iSST: public SST{
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    class iSST: public SST<STATE_DIMENSION,CONTROL_DIMENSION>,virtual public Planner<STATE_DIMENSION,CONTROL_DIMENSION>{
+        //using Planner<STATE_DIMENSION>::_dynamic_system;
+        //using Planner<STATE_DIMENSION>::_best_goal;
+        //using Planner<STATE_DIMENSION>::_init_state;
+        //using Planner<STATE_DIMENSION>::_target_state;
+        //using Planner<STATE_DIMENSION>::_best_cost;
+        //using Planner<STATE_DIMENSION>::_run_flag;
+        //using Planner<STATE_DIMENSION>::_planner_connection;
+        //using SST<STATE_DIMENSION>::optimize_set;
+        //using SST<STATE_DIMENSION>::addToTree;
+
+
+
+        using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
+        using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
+
+        using TreeNodeType = TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>;
+        using SSTTreeNodeType = SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>;
+
+        using NodePtr = std::shared_ptr<Node<STATE_DIMENSION>>;
+        using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
+        using SSTTreeNodePtr = std::shared_ptr <SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
+
 
     protected:
 
@@ -16,7 +39,7 @@ namespace acsr{
          * setup
          */
         void setup() override {
-            SST::setup();
+            SST<STATE_DIMENSION,CONTROL_DIMENSION>::setup();
         }
 
         /***
@@ -26,13 +49,13 @@ namespace acsr{
          * @return
          */
         bool searchSelection(TreeId tree_id, TreeNodePtr& parent){
-            auto point = _dynamic_system->randomState();
-            auto near = getNearNodeByCount(point,tree_id,10);
+            auto point = this->_dynamic_system->randomState();
+            auto near = this->getNearNodeByCount(point,tree_id,10);
             auto it = std::min_element(near.begin(), near.end(),
                                        [](const NodePtr &node1, const NodePtr &node2) {
-                                           return std::static_pointer_cast<TreeNode>(node1)->getCost() < std::static_pointer_cast<TreeNode>(node2)->getCost();
+                                           return std::static_pointer_cast<TreeNodeType>(node1)->getCost() < std::static_pointer_cast<TreeNodeType>(node2)->getCost();
                                        });
-            parent = std::static_pointer_cast<TreeNode>(*it);
+            parent = std::static_pointer_cast<TreeNodeType>(*it);
             if(nullptr == parent)
                 return false;
             return true;
@@ -46,13 +69,13 @@ namespace acsr{
          * @param duration store temp duration
          * @return true if blossom process success
          */
-        bool forwardBlossom(const SSTTreeNodePtr & parent,Eigen::VectorXd& state,Eigen::VectorXd& control,double& duration){
+        bool forwardBlossom(const SSTTreeNodePtr & parent,StateType& state,ControlType & control,double& duration){
 
             if(parent->getTreeId()!=TreeId::forward || !parent->isActive())
                 return false;
             bool return_value = false;
 
-            Eigen::VectorXd temp_state;
+            StateType temp_state;
             double temp_duration;
             auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_goal->getState());
 
@@ -82,11 +105,11 @@ namespace acsr{
          * @param duration store temp duration
          * @return true if blossom process success
          */
-        bool backwardBlossom(const SSTTreeNodePtr& parent,Eigen::VectorXd& state,Eigen::VectorXd& control,double& duration){
+        bool backwardBlossom(const SSTTreeNodePtr& parent,StateType & state,ControlType & control,double& duration){
             if(parent->getTreeId()!=TreeId::backward || !parent->isActive())
                 return false;
             bool return_value = false;
-            Eigen::VectorXd temp_state;
+            StateType temp_state;
             double temp_duration;
             auto heuristic_value = this->_dynamic_system->getHeuristic(parent->getState(),this->_root->getState());
 
@@ -109,16 +132,15 @@ namespace acsr{
         }
 
     public:
-        explicit iSST(std::shared_ptr<NanowireSystem> dynamic_system):SST(dynamic_system){
+        explicit iSST(std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,16>> dynamic_system):SST<STATE_DIMENSION,CONTROL_DIMENSION>(dynamic_system),
+                                                                      Planner<STATE_DIMENSION,CONTROL_DIMENSION>(dynamic_system){
         }
 
         iSST()=delete;
         iSST(const iSST&) = delete;
 
         ~iSST() override{
-            this->forward_tree.clear();
-            this->backward_tree.clear();
-            this->optimize_set.clear();
+
         }
 
         /***
@@ -128,14 +150,14 @@ namespace acsr{
             ///select a node to be explored in forward tree
             TreeNodePtr parent;
             searchSelection(TreeId::forward,parent);
-            if(!std::static_pointer_cast<SSTTreeNode>(parent)->isActive())
+            if(!std::static_pointer_cast<SSTTreeNodeType>(parent)->isActive())
                 return;
 
-            Eigen::VectorXd state;
-            Eigen::VectorXd control;
+            StateType state;
+            ControlType control;
             double duration;
             ///cast the node to sst type
-            auto sst_parent = std::dynamic_pointer_cast<SSTTreeNode>(parent);
+            auto sst_parent = std::dynamic_pointer_cast<SSTTreeNodeType>(parent);
 
             ///perform blossom, until it fails
             while (forwardBlossom(sst_parent,state,control,duration)){
@@ -144,7 +166,7 @@ namespace acsr{
                 this->checkConnection(new_node);
                 if(PlannerConfig::show_node && new_node!= nullptr){
                     std::thread t([this,state](){
-                        notifyNodeAdded(state,TreeId::forward);
+                        this->notifyNodeAdded(state,TreeId::forward);
                     });
                     t.detach();
                 }
@@ -165,18 +187,18 @@ namespace acsr{
                 return;
             TreeNodePtr parent;
             searchSelection(TreeId::backward,parent);
-            if(!std::static_pointer_cast<SSTTreeNode>(parent)->isActive())return;
+            if(!std::static_pointer_cast<SSTTreeNodeType>(parent)->isActive())return;
 
-            Eigen::VectorXd state;
-            Eigen::VectorXd control;
+            StateType state;
+            ControlType control;
             double duration;
-            auto sst_parent = std::dynamic_pointer_cast<SSTTreeNode>(parent);
+            auto sst_parent = std::dynamic_pointer_cast<SSTTreeNodeType>(parent);
             while (backwardBlossom(sst_parent,state,control,duration)){
                 auto new_node = this->addToTree(TreeId::backward,sst_parent,state,control,duration);
                 this->checkConnection(new_node);
                 if(PlannerConfig::show_node && new_node!= nullptr){
                     std::thread t([this,state](){
-                        notifyNodeAdded(state,TreeId::backward);
+                        this->notifyNodeAdded(state,TreeId::backward);
                     });
                     t.detach();
                 }

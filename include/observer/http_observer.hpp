@@ -25,16 +25,20 @@ namespace acsr {
 /***
  * @brief an http server for observing planner data. implement planner start and solution update interface
  */
-    class HttpServer : public SolutionUpdateObserver, public PlannerStartObserver {
-        //using VectorStateType = Eigen::Matrix<StateType,Eigen::Dynamic,1>;
-        //using VectorControlType = Eigen::Matrix<ControlType,Eigen::Dynamic,1>;
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    class HttpServer : public SolutionUpdateObserver<STATE_DIMENSION,CONTROL_DIMENSION>,
+            public PlannerStartObserver<STATE_DIMENSION,CONTROL_DIMENSION> {
+
+        using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
+        using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
+
     public:
         /***
          * constructor
          * @param _port
          */
-        HttpServer(int port_) : port(port_), SolutionUpdateObserver(),
-                                PlannerStartObserver() {
+        HttpServer(int port_) : port(port_), SolutionUpdateObserver<STATE_DIMENSION,CONTROL_DIMENSION>(),
+                                PlannerStartObserver<STATE_DIMENSION,CONTROL_DIMENSION>() {
 
         }
 
@@ -63,8 +67,8 @@ namespace acsr {
         virtual void onPlannerStart(
                 std::string type,
                 int robot_count,
-                const Eigen::VectorXd &_start_state,
-                const Eigen::VectorXd &_target_state,
+                const StateType &_start_state,
+                const StateType &_target_state,
                 const ACADO::VariablesGrid& reference_path,
                 bool bidrectional,
                 bool optimization,
@@ -114,12 +118,12 @@ namespace acsr {
          * @param reverse_durations
          * @param connect_durations
          */
-        virtual void onSolutionUpdate(const std::vector<Eigen::VectorXd> &forward_states,
-                                      const std::vector<Eigen::VectorXd> &reverse_states,
-                                      const std::vector<Eigen::VectorXd> &connect_states,
-                                      const std::vector<Eigen::VectorXd> &forward_control,
-                                      const std::vector<Eigen::VectorXd> &reverse_control,
-                                      const std::vector<Eigen::VectorXd> &connect_control,
+        virtual void onSolutionUpdate(const std::vector<StateType> &forward_states,
+                                      const std::vector<StateType> &reverse_states,
+                                      const std::vector<StateType> &connect_states,
+                                      const std::vector<ControlType> &forward_control,
+                                      const std::vector<ControlType> &reverse_control,
+                                      const std::vector<ControlType> &connect_control,
                                       const std::vector<double> &forward_durations,
                                       const std::vector<double> &reverse_durations,
                                       const std::vector<double> &connect_durations,

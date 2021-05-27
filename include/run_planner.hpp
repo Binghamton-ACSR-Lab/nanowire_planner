@@ -18,7 +18,7 @@
 #include <string>
 #include <exception>
 namespace acsr {
-
+    template <int NANOWIRE_COUNT>
     class RunPlanner {
 
     public:
@@ -38,17 +38,17 @@ namespace acsr {
             NanowireConfig::readFile("config/nanowire.cfg");
 
             //callback function for tcp server and http server, to parse string to command from clients
-            auto callback  = std::bind(&RunPlanner::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
+            auto callback  = std::bind(&RunPlanner<NANOWIRE_COUNT>::parseCommand,this,std::placeholders::_1,std::placeholders::_2);
 
             // start tcp server
-            tcp_server = std::make_shared<TcpServer> (SystemConfig::tcp_port);
+            tcp_server = std::make_shared<TcpServer<2*NANOWIRE_COUNT,16>> (SystemConfig::tcp_port);
             std::cout<<"start tcp server at port "<<SystemConfig::tcp_port<<std::endl;
             tcp_server->run(callback);
 
             ///start http server
-            http_observer = std::make_shared<HttpServer>(SystemConfig::http_port);
+            http_observer = std::make_shared<HttpServer<2*NANOWIRE_COUNT,16>>(SystemConfig::http_port);
             std::cout<<"start http server at port "<<SystemConfig::http_port<<std::endl;
-            svg_observer = std::make_shared<SvgObserver>();
+            svg_observer = std::make_shared<SvgObserver<2*NANOWIRE_COUNT,16>>();
             http_observer->run(callback);
 
             ///set tcp_server as message displayer
@@ -60,9 +60,10 @@ namespace acsr {
          * @param wire_count nanowire count
          */
         void performanceTest(int wire_count) {
-            nanowire_system = std::make_shared<NanowireSystem>(wire_count,_field_dimension);
+            nanowire_system = std::make_shared<NanowireSystem<NANOWIRE_COUNT,16>>(wire_count,_field_dimension);
             http_observer->reset();
-            planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
+            //const int state_dimension = 2*wire_count;
+            auto planner = PlannerBuilder::create<2*NANOWIRE_COUNT>(PlannerConfig::planner,nanowire_system);
 
             ///necessary setting
             planner->setStartState(PlannerConfig::init_state);
@@ -83,20 +84,20 @@ namespace acsr {
 
             ///forward step threadcc
             forward_run_flag = true;
-            forward_thread = std::thread(&RunPlanner::forwardExplore,this);
+            forward_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::forwardExplore,this);
 
             ///reverse step thread
             if(PlannerConfig::bidirection){
                 reverse_run_flag = true;
                 planner->setBiTreePlanner(true);
-                reverse_thread = std::thread(&RunPlanner::reverseExplore,this);
+                reverse_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::reverseExplore,this);
             }
 
             ///connecting thread
             if(PlannerConfig::optimization){
                 optimize_run_flag = true;
                 planner->setOptimizedConnect(true);
-                connecting_thread = std::thread(&RunPlanner::connecting,this);
+                connecting_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::connecting,this);
             }
 
             auto start = std::chrono::steady_clock::now();
@@ -195,34 +196,35 @@ namespace acsr {
                 }
 
                 ///nanowire count
+                int n_wire;
                 try {
-                    _n_wires = std::stoi(strs[1]);
+                    n_wire = std::stoi(strs[1]);
                 }catch (std::invalid_argument& e){
                     msg = std::string(e.what()) + "\nWrong Command Format!!";
                     showMessage(msg);
                     return msg;
                 }
                 ///start wire_count field_dimension zeta_1 ... zeta_2n init_1 ... init_2n target_1 .. target_2n height_1 ... height_n
-                if(_n_wires == 0 || strs.size()!=7*_n_wires+3){
+                if(n_wire != NANOWIRE_COUNT || strs.size()!=7*n_wire+3){
                     msg = "Wrong Command Format!!";
                     showMessage(msg);
                     return msg;
                 }
 
-                zeta.resize(2*_n_wires);
-                _init_states.resize(2*_n_wires);
-                _target_states.resize(2*_n_wires);
-                _height.resize(_n_wires);
+                zeta.resize(2*n_wire);
+                _init_states.resize(2*n_wire);
+                _target_states.resize(2*n_wire);
+                _height.resize(n_wire);
 
                 try {
                     _field_dimension = std::stoi(strs[2]);
-                    for (int i=0;i<2*_n_wires;i++) {
+                    for (int i=0;i<2*n_wire;i++) {
                         zeta[i] = std::stod(strs[3 + i]);
-                        _init_states[i] = std::stod(strs[3 + 2 * _n_wires + i]) * 1e-6;
-                        _target_states[i] = std::stod(strs[3 + 4 * _n_wires + i]) * 1e-6;
+                        _init_states[i] = std::stod(strs[3 + 2 * n_wire + i]) * 1e-6;
+                        _target_states[i] = std::stod(strs[3 + 4 * n_wire + i]) * 1e-6;
                     }
-                    for (int i=0;i<_n_wires;i++) {
-                        _height[i] = std::stod(strs[3 + 6 * _n_wires + i])* 1e-6;
+                    for (int i=0;i<n_wire;i++) {
+                        _height[i] = std::stod(strs[3 + 6 * n_wire + i])* 1e-6;
                     }
                 }catch(std::invalid_argument& e){
                     msg = std::string(e.what()) + "\nWrong Command Format!!";
@@ -234,8 +236,8 @@ namespace acsr {
                 msg ="";
                 {
                     std::vector<std::string> msgs{"Starting new planner: "};
-                    msgs.push_back("nano wire count: " + std::to_string(_n_wires));
-                    for (int i = 0; i < _n_wires; i++) {
+                    msgs.push_back("nano wire count: " + std::to_string(n_wire));
+                    for (int i = 0; i < n_wire; i++) {
                         msgs.push_back("--Nano Wire " + std::to_string(i + 1) + ": start point: " +
                                        std::to_string(int(_init_states[2 * i]*1e6)) + "," +
                                        std::to_string(int(_init_states[2 * i + 1]*1e6))
@@ -243,7 +245,7 @@ namespace acsr {
                                        std::to_string(int(_target_states[2 * i + 1]*1e6)) + ": current height: " + std::to_string(int(_height[i]*1e6)));
                     }
                     std::string str = "--Zeta Potential: ";
-                    for (int i = 0; i < 2 * _n_wires; i++) {
+                    for (int i = 0; i < 2 * n_wire; i++) {
                         str.append(std::to_string(zeta[i]) + " ");
                     }
                     msgs.push_back(str);
@@ -252,7 +254,7 @@ namespace acsr {
                     showMessage(msg);
                 }
 
-                std::thread t(&RunPlanner::startNewPlanner,this);
+                std::thread t(&RunPlanner<NANOWIRE_COUNT>::startNewPlanner,this);
                 t.detach();
                 return msg;
             }else if(strs[0]=="RESET"){
@@ -274,30 +276,30 @@ namespace acsr {
                     showMessage(msg);
                     return msg;
                 }
-                if(_n_wires!=n_wire){
+                if(NANOWIRE_COUNT!=n_wire){
                     msg = "Wrong Command Format!!";
                     showMessage(msg);
                     return msg;
                 }
                 ///reset wire_count field_dimension zeta_1 ... zeta_2n init_1 ... init_2n height_1 ... height_n
-                if(strs.size()!=5*_n_wires+3){
+                if(strs.size()!=5*n_wire+3){
                     msg = "Wrong Command Format!!";
                     showMessage(msg);
                     return msg;
                 }
 
-                std::vector<double> temp_zeta(2*_n_wires);
-                std::vector<double> temp_init_states(2*_n_wires);
-                std::vector<double> temp_height(_n_wires);
+                std::vector<double> temp_zeta(2*n_wire);
+                std::vector<double> temp_init_states(2*n_wire);
+                std::vector<double> temp_height(n_wire);
 
                 try {
                     _field_dimension = std::stoi(strs[2]);
-                    for (int i=0;i<2*_n_wires;i++) {
+                    for (int i=0;i<2*n_wire;i++) {
                         temp_zeta[i] = std::stod(strs[3 + i]);
-                        temp_init_states[i] = std::stod(strs[3 + 2 * _n_wires + i]) * 1e-6;
+                        temp_init_states[i] = std::stod(strs[3 + 2 * n_wire + i]) * 1e-6;
                     }
-                    for (int i=0;i<_n_wires;i++) {
-                        temp_height[i] = std::stod(strs[3 + 4 * _n_wires + i])* 1e-6;
+                    for (int i=0;i<n_wire;i++) {
+                        temp_height[i] = std::stod(strs[3 + 4 * n_wire + i])* 1e-6;
                     }
                 }catch(std::invalid_argument& e){
                     msg = std::string(e.what()) + "\nWrong Command Format!!";
@@ -306,7 +308,7 @@ namespace acsr {
                 }
 
                 bool zeta_flag = true;
-                for (int i=0;i<2*_n_wires;i++) {
+                for (int i=0;i<2*n_wire;i++) {
                     if(std::abs(temp_zeta[i]-zeta[i])>0.01){
                         zeta_flag = false;
                         break;
@@ -314,7 +316,7 @@ namespace acsr {
                 }
 
                 bool init_flag = true;
-                for (int i=0;i<2*_n_wires;i++) {
+                for (int i=0;i<2*n_wire;i++) {
                     if(std::abs(temp_init_states[i]-_init_states[i])>10e-6){
                         init_flag = false;
                         break;
@@ -322,7 +324,7 @@ namespace acsr {
                 }
 
                 bool height_flag = true;
-                for (int i=0;i<_n_wires;i++) {
+                for (int i=0;i<n_wire;i++) {
                     if(std::abs(temp_init_states[i]-_init_states[i])>1e-6){
                         init_flag = false;
                         break;
@@ -342,14 +344,14 @@ namespace acsr {
                 msg = "";
                 {
                     std::vector<std::string> msgs{"Reset new planner: "};
-                    msgs.push_back("nano wire count: " + std::to_string(_n_wires));
-                    for (int i = 0; i < _n_wires; i++) {
+                    msgs.push_back("nano wire count: " + std::to_string(n_wire));
+                    for (int i = 0; i < n_wire; i++) {
                         msgs.push_back("--Nano Wire " + std::to_string(i + 1) + ": start point: " +
                                        std::to_string(int(_init_states[2 * i]*1e6)) + "," +
                                        std::to_string(int(_init_states[2 * i + 1]*1e6)) + ": current height: " + std::to_string(int(_height[i]*1e6)));
                     }
                     std::string str = "Reset:\n--Zeta Potential: ";
-                    for (int i = 0; i < 2 * _n_wires; i++) {
+                    for (int i = 0; i < 2 * n_wire; i++) {
                         str.append(std::to_string(zeta[i]) + " ");
                     }
                     msgs.push_back(str);
@@ -364,7 +366,7 @@ namespace acsr {
                 while(!forward_stopped_flag);
                 while(!reverse_stopped_flag);
                 while(!optimize_stopped_flag);
-                std::thread t(&RunPlanner::resetPlanner,this);
+                std::thread t(&RunPlanner<NANOWIRE_COUNT>::resetPlanner,this);
                 t.detach();
                 return msg;
             }else if(strs[0]=="STOP"){
@@ -462,21 +464,21 @@ namespace acsr {
             http_observer->reset();
 
             ///create a new nanowire system
-            nanowire_system = std::make_shared<NanowireSystem>(_n_wires,_field_dimension);
+            nanowire_system = std::make_shared<NanowireSystem<NANOWIRE_COUNT,16>>(_field_dimension);
             ///set parameters for nanowire system
-            Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),_n_wires);
-            Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*_n_wires);
+            Eigen::Map<Eigen::Matrix<double,NANOWIRE_COUNT,1>> height_vec(_height.data());
+            Eigen::Map<Eigen::Matrix<double,2*NANOWIRE_COUNT,1>> zeta_vec(zeta.data());
             nanowire_system->init(zeta_vec, height_vec);
             nanowire_system->reset();
 
             ///create a new planner
-            planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
-            planner->setStartState(Eigen::Map<Eigen::VectorXd>(_init_states.data(),2*_n_wires));
-            planner->setTargetState(Eigen::Map<Eigen::VectorXd>(_target_states.data(),2*_n_wires));
+            planner = PlannerBuilder::create<2*NANOWIRE_COUNT,16>(PlannerConfig::planner,nanowire_system);
+            planner->setStartState(Eigen::Map<Eigen::Matrix<double,2*NANOWIRE_COUNT,1>>(_init_states.data()));
+            planner->setTargetState(Eigen::Map<Eigen::Matrix<double,2*NANOWIRE_COUNT,1>>(_target_states.data()));
             planner->setGoalRadius(PlannerConfig::goal_radius);
 
 
-            svg_observer->setNanowireConfig(_n_wires);
+            svg_observer->setNanowireConfig(NANOWIRE_COUNT);
             planner->registerSolutionUpdateObserver(svg_observer);
             planner->registerPlannerStartObserver(svg_observer);
             planner->registerSolutionUpdateObserver(http_observer);
@@ -491,19 +493,19 @@ namespace acsr {
 
             ///forward step threadcc
             forward_run_flag = true;
-            forward_thread = std::thread(&RunPlanner::forwardExplore,this);
+            forward_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::forwardExplore,this);
             forward_thread.detach();
             if(PlannerConfig::bidirection){
                 reverse_run_flag = true;
                 planner->setBiTreePlanner(true);
-                reverse_thread = std::thread(&RunPlanner::reverseExplore,this);
+                reverse_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::reverseExplore,this);
                 reverse_thread.detach();
             }
 
             if(PlannerConfig::optimization){
                 optimize_run_flag = true;
                 planner->setOptimizedConnect(true);
-                connecting_thread = std::thread(&RunPlanner::connecting,this);
+                connecting_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::connecting,this);
                 connecting_thread.detach();
             }
             VariablesGrid vg;
@@ -525,15 +527,15 @@ namespace acsr {
             http_observer->reset();
 
             ///reset nanowire parameters
-            Eigen::Map<Eigen::VectorXd> height_vec(_height.data(),_n_wires);
-            Eigen::Map<Eigen::VectorXd> zeta_vec(zeta.data(),2*_n_wires);
+            Eigen::Map<Eigen::Matrix<double,NANOWIRE_COUNT,1>> height_vec(_height.data(),NANOWIRE_COUNT);
+            Eigen::Map<Eigen::Matrix<double,2*NANOWIRE_COUNT,1>> zeta_vec(zeta.data(),2*NANOWIRE_COUNT);
             nanowire_system->init(zeta_vec, height_vec);
             nanowire_system->reset();
 
             ///create new planner
-            planner = PlannerBuilder::create(PlannerConfig::planner,nanowire_system);
-            planner->setStartState(Eigen::Map<Eigen::VectorXd>(_init_states.data(),2*_n_wires));
-            planner->setTargetState(Eigen::Map<Eigen::VectorXd>(_target_states.data(),2*_n_wires));
+            planner = PlannerBuilder::create<2*NANOWIRE_COUNT,16>(PlannerConfig::planner,nanowire_system);
+            planner->setStartState(Eigen::Map<Eigen::Matrix<double,2*NANOWIRE_COUNT,1>>(_init_states.data(),2*NANOWIRE_COUNT));
+            planner->setTargetState(Eigen::Map<Eigen::Matrix<double,2*NANOWIRE_COUNT,1>>(_target_states.data(),2*NANOWIRE_COUNT));
             planner->setGoalRadius(PlannerConfig::goal_radius);
 
             ///register observers
@@ -549,20 +551,20 @@ namespace acsr {
             std::thread forward_thread,reverse_thread,connecting_thread;
             ///forward step thread
             forward_run_flag = true;
-            forward_thread = std::thread(&RunPlanner::forwardExplore,this);
+            forward_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::forwardExplore,this);
             forward_thread.detach();
             ///reverse thread
             if(PlannerConfig::bidirection){
                 reverse_run_flag = true;
                 planner->setBiTreePlanner(true);
-                reverse_thread = std::thread(&RunPlanner::reverseExplore,this);
+                reverse_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::reverseExplore,this);
                 reverse_thread.detach();
             }
             ///connect thread
             if(PlannerConfig::optimization){
                 optimize_run_flag = true;
                 planner->setOptimizedConnect(true);
-                connecting_thread = std::thread(&RunPlanner::connecting,this);
+                connecting_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::connecting,this);
                 connecting_thread.detach();
             }
             run_flag = true;
@@ -574,8 +576,8 @@ namespace acsr {
 
 
     private:
-        std::shared_ptr<Planner> planner; //planner
-        std::shared_ptr<NanowireSystem> nanowire_system; //nanowire system
+        std::shared_ptr<Planner<2*NANOWIRE_COUNT,16>> planner; //planner
+        std::shared_ptr<NanowireSystem<NANOWIRE_COUNT,16>> nanowire_system; //nanowire system
 
         ///running flags
         std::atomic_bool forward_run_flag{false};
@@ -592,18 +594,18 @@ namespace acsr {
         std::atomic<bool> exit_flag{false};
 
         ///observers
-        std::shared_ptr<SvgObserver> svg_observer;
-        std::shared_ptr<HttpServer> http_observer;
+        std::shared_ptr<SvgObserver<2*NANOWIRE_COUNT,16>> svg_observer;
+        std::shared_ptr<HttpServer<2*NANOWIRE_COUNT,16>> http_observer;
         //std::shared_ptr<DatabaseObserver> db_observer;
 
-        int _n_wires;
+        //int _n_wires;
         int _field_dimension;
         std::vector<double> zeta;
         std::vector<double> _init_states;
         std::vector<double> _target_states;
         std::vector<double> _height;
         std::vector<std::shared_ptr<MessageDisplayer>> message_displayers;
-        std::shared_ptr<TcpServer> tcp_server;
+        std::shared_ptr<TcpServer<2*NANOWIRE_COUNT,16>> tcp_server;
 
     private:
         /***

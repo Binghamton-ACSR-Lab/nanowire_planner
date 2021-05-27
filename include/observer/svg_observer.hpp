@@ -10,8 +10,12 @@
 #include <boost/filesystem.hpp>
 
 namespace acsr {
-
-    class SvgObserver : public SolutionUpdateObserver, public PlannerStartObserver, public NodeAddedObserver{
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    class SvgObserver : public SolutionUpdateObserver<STATE_DIMENSION,CONTROL_DIMENSION>,
+            public PlannerStartObserver<STATE_DIMENSION,CONTROL_DIMENSION>,
+            public NodeAddedObserver<STATE_DIMENSION,CONTROL_DIMENSION>{
+        using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
+        using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
     private:
         const std::vector<Color> colors =  { Color::Red, Color::Black, Color::Blue, Color::Fuchsia,
                                              Color::Green, Color::Lime, Color::Orange, Color::Purple, Color::Silver,Color::Brown , Color::Magenta,  Color::Cyan};
@@ -80,8 +84,8 @@ namespace acsr {
         virtual void onPlannerStart(
                 std::string type,
                 int robot_count,
-                const Eigen::VectorXd& init_state,
-                const Eigen::VectorXd& target_state,
+                const StateType& init_state,
+                const StateType& target_state,
                 const ACADO::VariablesGrid& reference_path,
                 bool bidirectional,
                 bool optimization,
@@ -129,12 +133,12 @@ namespace acsr {
          * @param reverse_durations reverse path cost
          * @param connect_durations connection path cost
          */
-        virtual void onSolutionUpdate(const std::vector <Eigen::VectorXd> &forward_states,
-                                      const std::vector <Eigen::VectorXd> &reverse_states,
-                                      const std::vector <Eigen::VectorXd> &connect_states,
-                                      const std::vector <Eigen::VectorXd> &forward_control,
-                                      const std::vector <Eigen::VectorXd> &reverse_control,
-                                      const std::vector <Eigen::VectorXd> &connect_control,
+        virtual void onSolutionUpdate(const std::vector <StateType> &forward_states,
+                                      const std::vector <StateType> &reverse_states,
+                                      const std::vector <StateType> &connect_states,
+                                      const std::vector <ControlType> &forward_control,
+                                      const std::vector <ControlType> &reverse_control,
+                                      const std::vector <ControlType> &connect_control,
                                       const std::vector<double> &forward_durations,
                                       const std::vector<double> &reverse_durations,
                                       const std::vector<double> &connect_durations,
@@ -240,7 +244,7 @@ namespace acsr {
             return svg;
         }
 
-        void onNodeAdded(const Eigen::VectorXd &state,TreeId id) override {
+        void onNodeAdded(const StateType &state,TreeId id) override {
             std::scoped_lock<std::mutex> lock(m);
             if(id==TreeId::forward) {
                 for(auto i=0;i<state.size()/2;++i) {
@@ -261,7 +265,7 @@ namespace acsr {
          * @param robot_index nanowire index
          * @return
          */
-        inline Point convertStateToImagePoint(const Eigen::VectorXd &state, int robot_index) {
+        inline Point convertStateToImagePoint(const StateType &state, int robot_index) {
             return Point(
                     zoom * (state(robot_index * 2)*600/NanowireConfig::electrodes_space ) +
                     0.05 * width,

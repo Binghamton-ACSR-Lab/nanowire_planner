@@ -449,19 +449,20 @@ namespace acsr {
          * @param mat_E matrix storing field
          * @param wire_count wire count
          */
-        void getField(const Eigen::VectorXd &state, const Eigen::VectorXd &height, Eigen::MatrixXd &mat_E, int wire_count) {
+        template<int WIRE_COUNT>
+        void getField(const Eigen::Matrix<double,2*WIRE_COUNT,1> &state, const Eigen::Matrix<double,WIRE_COUNT,1> &height, Eigen::MatrixXd &mat_E) {
             auto pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
-            mat_E.resize(2 * wire_count, pages);
-            double ex[2 * wire_count][pages];
+            mat_E.resize(2 * WIRE_COUNT, pages);
+            double ex[2 * WIRE_COUNT][pages];
             if(_dimension==2) {
-                for (int k = 0; k < wire_count; ++k) {
+                for (int k = 0; k < WIRE_COUNT; ++k) {
                     for (int i = 0; i < pages; ++i) {
                         ex[2 * k][i] = double(interp2d(i, float(state(2*k)), float(state(2*k+1))));
                         ex[2 * k + 1][i] = double(interp2d(i + pages, float(state(2*k)), float(state(2*k+1))));
                     }
                 }
             }else if(_dimension==3){
-                for(int k=0;k<wire_count;++k){
+                for(int k=0;k<WIRE_COUNT;++k){
                     for(int i=0;i<pages;++i){
                         ex[2*k][i]=double(interp3d(i,float(state(2*k)),float(state(2*k+1)),float(height(k))));
                         ex[2*k+1][i]=double(interp3d(i+pages,float(state(2*k)),float(state(2*k+1)),float(height(k))));
@@ -469,7 +470,7 @@ namespace acsr {
                 }
             }
             ///mapping 2d-array to matrix
-            mat_E = Eigen::Matrix<double,-1,-1,Eigen::RowMajor>::Map(&ex[0][0],2*wire_count,pages);
+            mat_E = Eigen::Matrix<double,-1,-1,Eigen::RowMajor>::Map(&ex[0][0],2*WIRE_COUNT,pages);
         }
     };
 }

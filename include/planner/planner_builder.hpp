@@ -29,18 +29,19 @@ namespace acsr {
          * @param dynamic_system the dynamic system used for this planner
          * @return an shared pointer to planner
          */
-        static std::shared_ptr<Planner> create(PlannerType planner_type, std::shared_ptr<NanowireSystem> dynamic_system) {
-            std::shared_ptr<Planner> planner;
+        template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+        static std::shared_ptr<Planner<STATE_DIMENSION,CONTROL_DIMENSION>> create(PlannerType planner_type, std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,16>> dynamic_system) {
+            std::shared_ptr<Planner<STATE_DIMENSION,CONTROL_DIMENSION>> planner;
             switch (planner_type) {
 
                 case PlannerType::e_SST:
-                    planner = std::make_shared<SST>(dynamic_system);
+                    planner = std::make_shared<SST<STATE_DIMENSION,CONTROL_DIMENSION>>(dynamic_system);
                     break;
                 case PlannerType::e_iSST:
-                    planner = std::make_shared<iSST>(dynamic_system);
+                    planner = std::make_shared<iSST<STATE_DIMENSION,CONTROL_DIMENSION>>(dynamic_system);
                     break;
                 case PlannerType::e_Ref_iSST:
-                    planner = std::make_shared<RefSST>(dynamic_system);
+                    planner = std::make_shared<RefSST<STATE_DIMENSION,CONTROL_DIMENSION>>(dynamic_system);
             }
             return planner;
         }

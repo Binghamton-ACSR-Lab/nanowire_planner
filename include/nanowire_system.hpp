@@ -17,6 +17,7 @@
 namespace acsr {
 
     USING_NAMESPACE_ACADO
+    template <int NANOWIRE_COUNT>
     class ReferencePath
     {
     public:
@@ -51,7 +52,7 @@ namespace acsr {
          * @param time time
          * @return state
          */
-        Eigen::MatrixXd getState(double time){
+        DVector getState(double time){
             return _path.linearInterpolation(time);
         }
 
@@ -67,20 +68,23 @@ namespace acsr {
         VariablesGrid _path;
     };
 
+    template <int NANOWIRE_COUNT,int ELECTRODE_COUNT>
     class NanowireSystem  {
+        using StateType = Eigen::Matrix<double,2*NANOWIRE_COUNT,1>;
+        using ControlType = Eigen::Matrix<double,ELECTRODE_COUNT,1>;
     private:
-        int _n_wire;
-        int _control_dimension = 16;
+        //int _n_wire;
+        //int _control_dimension = 16;
         std::atomic_bool _run_flag;
         std::shared_ptr<EpField> _field;
 
-        Eigen::VectorXd _state_low_bound;
-        Eigen::VectorXd _state_upper_bound;
-        Eigen::VectorXd _control_low_bound;
-        Eigen::VectorXd _control_upper_bound;
+        StateType _state_low_bound;
+        StateType _state_upper_bound;
+        ControlType _control_low_bound;
+        ControlType _control_upper_bound;
 
-        Eigen::VectorXd _current_height;
-        Eigen::MatrixXd _mat_theta;
+        Eigen::Matrix<double,NANOWIRE_COUNT,1> _current_height;
+        Eigen::Matrix<double,2*NANOWIRE_COUNT,2*NANOWIRE_COUNT> _mat_theta;
 
         const double _e0 = 8.85e-12;
         const double _em = 2.17 * _e0;
@@ -100,26 +104,26 @@ namespace acsr {
          * @param wire_count nanowire count
          * @param field_dimension electrical field dimension
          */
-        NanowireSystem(int wire_count, int field_dimension) : _field_dimension(field_dimension){
+        NanowireSystem(int field_dimension) : _field_dimension(field_dimension){
             _field = std::make_shared<EpField>(_field_dimension);
             _field->readFile();
-            _n_wire = wire_count;
+            //_n_wire = wire_count;
 
-            _state_low_bound.resize(2 * _n_wire);
+            _state_low_bound.resize(2 * NANOWIRE_COUNT);
             _state_low_bound.setConstant(10e-6);
 
-            _state_upper_bound.resize(2 * _n_wire);
-            for (auto i = 0; i < _n_wire; ++i) {
+            _state_upper_bound.resize(2 * NANOWIRE_COUNT);
+            for (auto i = 0; i < NANOWIRE_COUNT; ++i) {
                 _state_upper_bound(2 * i) =
                         NanowireConfig::electrodes_space * (NanowireConfig::electrodes_columns - 1)-10e-6;
                 _state_upper_bound(2 * i + 1) =
                         NanowireConfig::electrodes_space * (NanowireConfig::electrodes_rows - 1)-10e-6;
             }
 
-            _control_dimension = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
-            _control_low_bound.resize(_control_dimension);
+            //_control_dimension = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
+            _control_low_bound.resize(ELECTRODE_COUNT);
             _control_low_bound.setZero();
-            _control_upper_bound.resize(_control_dimension);
+            _control_upper_bound.resize(ELECTRODE_COUNT);
             _control_upper_bound.setOnes();
         }
 
@@ -130,7 +134,7 @@ namespace acsr {
          * @param zeta zeta potential
          * @param height nanowire height, ignored if dimension = 2
          */
-        void init(const Eigen::VectorXd& zeta, const Eigen::VectorXd& height){
+        void init(const Eigen::Matrix<double,2*NANOWIRE_COUNT,1>& zeta, const Eigen::Matrix<double,NANOWIRE_COUNT,1>& height){
             setZetaPotential(zeta);
             setHeight(height);
             updateStepLength();
@@ -141,9 +145,9 @@ namespace acsr {
          * @param state
          * @return
          */
-        IVector getGrid(DVector state){
+        Eigen::Matrix<int,2*NANOWIRE_COUNT,1> getGrid(Eigen::Matrix<double,2*NANOWIRE_COUNT,1> state){
             state/=PlannerConfig::sst_delta_drain;
-            return state.cast<int>();
+            return state.template cast<int>();
         }
 
         /***
@@ -169,11 +173,11 @@ namespace acsr {
         }
 
         size_t getControlDimension() const{
-            return _control_dimension;
+            return ELECTRODE_COUNT;
         }
 
         size_t getStateDimension() const{
-            return 2*_n_wire;
+            return 2*NANOWIRE_COUNT;
         }
 
         /***
@@ -182,7 +186,7 @@ namespace acsr {
          * @param state2
          * @return distance
          */
-        double distance(const Eigen::VectorXd &state1, const Eigen::VectorXd &state2) {
+        double distance(const Eigen::Matrix<double,2*NANOWIRE_COUNT,1> &state1, const Eigen::Matrix<double,2*NANOWIRE_COUNT,1> &state2) {
             return (state1 - state2).norm();
         }
 
@@ -192,8 +196,8 @@ namespace acsr {
          * @param state2
          * @return max distance
          */
-        double maxDistance(const Eigen::VectorXd &state1, const Eigen::VectorXd &state2) const {
-            std::vector<double> dist(_n_wire);
+        double maxDistance(const StateType &state1, const StateType &state2) const {
+            std::vector<double> dist(NANOWIRE_COUNT);
             for (auto i = 0; i < dist.size(); ++i) {
                 dist[i] = (state1.segment(2 * i, 2) - state2.segment(2 * i, 2)).norm();
             }
@@ -204,9 +208,9 @@ namespace acsr {
          * generate a random state within boundary
          * @return state
          */
-        Eigen::VectorXd randomState() {
-            Eigen::VectorXd state(2*_n_wire);
-            for(auto i=0;i<2*_n_wire;++i){
+        StateType randomState() {
+            StateType state;
+            for(auto i=0;i<2*NANOWIRE_COUNT;++i){
                 state(i) = randomDouble(_state_low_bound(i),_state_upper_bound(i));
             }
             //std::cout<<state<<std::endl;
@@ -218,15 +222,15 @@ namespace acsr {
          * generate a random control input within boundary
          * @return random control
          */
-        Eigen::VectorXd randomControl() {
-            Eigen::VectorXd control(_control_dimension);
+        ControlType randomControl() {
+            ControlType control;
             if(PlannerConfig::intermedia_control) {
-                for (auto i = 0; i < _control_dimension; ++i)
+                for (auto i = 0; i < ELECTRODE_COUNT; ++i)
                     control(i) = randomDouble(_control_low_bound(i),_control_upper_bound(i));
                 double p = 1.0 / control.maxCoeff();
                 return p*control;
             }else{
-                for (auto i = 0; i < _control_dimension; ++i)
+                for (auto i = 0; i < ELECTRODE_COUNT; ++i)
                     control(i) = randomInteger(_control_low_bound(i),_control_upper_bound(i));
                 return control;
             }
@@ -242,14 +246,12 @@ namespace acsr {
          * @return true if successfully propagated
          */
         bool
-        forwardPropagateBySteps(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control,
-                                int steps, Eigen::VectorXd &result_state, double &duration) {
-            if (init_state.size() != 2*_n_wire)
-                return false;
+        forwardPropagateBySteps(const StateType &init_state, const ControlType &control,
+                                int steps, StateType &result_state, double &duration) {
             Eigen::MatrixXd mat_E;
             result_state = init_state;
             for (auto i = 0; i < steps; ++i) {
-                _field->getField(result_state,_current_height, mat_E, _n_wire);
+                _field->getField<NANOWIRE_COUNT>(result_state,_current_height, mat_E);
                 auto mat_velocity = _mat_theta * mat_E * control * _em / _mu;
                 result_state += _step_length * mat_velocity;
                 if (!validState(result_state))
@@ -269,39 +271,26 @@ namespace acsr {
          * @return true if successfully propagated
          */
         bool
-        backwardPropagateBySteps(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control, //double step_length,
-                                int step, Eigen::VectorXd &result_state, double &duration){
+        backwardPropagateBySteps(const StateType &init_state, const ControlType &control, //double step_length,
+                                int step, StateType &result_state, double &duration){
             return forwardPropagateBySteps(init_state, control, step, result_state, duration);
         }
 
-        /*
-        std::vector<NodePtr>
-        getNearNodeByCount(const Eigen::VectorXd &state, const KdTreeType &tree, int count)  {
-            if (state.size() != 2*_n_wire)
-                return std::vector<NodePtr> ();
-            auto it = spatial::quadrance_neighbor_begin(tree, state);
-            auto max_count = std::min(int(tree.size()), count);
-            std::vector<NodePtr > near_nodes(max_count);
-            for (auto i = 0; i < max_count; ++i) {
-                near_nodes[i] = it->second;
-                ++it;
-            }
-            return near_nodes;
-        }*/
 
-        bool forwardPropagateByDistance(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control,
-                                        double max_distance, Eigen::VectorXd &result_state,
+
+        bool forwardPropagateByDistance(const StateType &init_state, const ControlType &control,
+                                        double max_distance, StateType &result_state,
                                         double &duration) {
             Eigen::MatrixXd mat_E;
             //auto nanowire_count = _nanowire_config->getNanowireCount();
-            if (init_state.size() != _n_wire)
+            if (init_state.size() != NANOWIRE_COUNT)
                 return false;
             result_state = init_state;
 
             int step = 0;
             duration = 0;
             while (distance(init_state, result_state) < max_distance) {
-                _field->getField(result_state,_current_height, mat_E, _n_wire);
+                _field->getField(result_state,_current_height, mat_E, NANOWIRE_COUNT);
                 auto mat_velocity = _mat_theta * mat_E * control * _em / _mu;
                 result_state += _step_length * mat_velocity;
                 if (!validState(result_state))
@@ -315,8 +304,8 @@ namespace acsr {
      * override DynamicSystem function
      * @return
      */
-        bool backwardPropagateByDistance(const Eigen::VectorXd &init_state, const Eigen::VectorXd &control,
-                                        double max_distance, Eigen::VectorXd &result_state,
+        bool backwardPropagateByDistance(const StateType &init_state, const StateType &control,
+                                        double max_distance, ControlType &result_state,
                                         double &duration) {
             return forwardPropagateByDistance(init_state, control,max_distance, result_state, duration);
         }
@@ -325,7 +314,7 @@ namespace acsr {
      * override DynamicSystem function
      * @return
      */
-        double getHeuristic(const Eigen::VectorXd &state1, const Eigen::VectorXd &state2)  {
+        double getHeuristic(const StateType &state1, const StateType &state2)  {
             ///1200e-6/100 is the max velocity;
             return maxDistance(state1, state2) /1e-5;
         }
@@ -334,6 +323,7 @@ namespace acsr {
          * override DynamicSystem function
          * @return
          */
+         /*
         virtual std::pair<std::vector<NodePtr>,NodePtr>
         getNearNodeByRadiusAndNearest(const Eigen::VectorXd &state, const KdTreeType  &tree,
                                       double radius)  {
@@ -348,15 +338,15 @@ namespace acsr {
                 }
             }
             return {near_nodes, nearest_node};
-        }
+        }*/
 
         /***
      * override DynamicSystem function
      * @return always false since this system can't be redirect
      */
-        bool redirect(const Eigen::VectorXd &start,
-                      const Eigen::VectorXd &target,
-                      Eigen::VectorXd &controls,
+        bool redirect(const StateType &start,
+                      const StateType &target,
+                      ControlType &controls,
                       double &duration) {
             std::cout << "Nanowire System Can't Be Redirected!/n";
             return false;
@@ -368,9 +358,9 @@ namespace acsr {
      * @param target
      * @return
      */
-        Eigen::VectorXd getGuideControl(const Eigen::VectorXd &start,
-                                        const Eigen::VectorXd &target)  {
-            return Eigen::VectorXd();
+        ControlType getGuideControl(const StateType &start,
+                                        const StateType &target)  {
+            return ControlType();
         }
 
         /***
@@ -379,14 +369,14 @@ namespace acsr {
      */
 
         int getRobotCount() {
-            return _n_wire;
+            return NANOWIRE_COUNT;
         }
 
         /***
      * override DynamicSystem function
      * @return
      */
-        bool connect(const Eigen::VectorXd &start, const Eigen::VectorXd &target,
+        bool connect(const StateType &start, const StateType &target,
                      Eigen::MatrixXd &vec_state,
                      Eigen::MatrixXd &vec_control,
                      Eigen::VectorXd &vec_duration)  {
@@ -406,8 +396,8 @@ namespace acsr {
                 return false;
             }
 
-            vec_state.resize(controls->getNumPoints(), 2 * _n_wire);
-            vec_control.resize(controls->getNumPoints(), _control_dimension);
+            vec_state.resize(controls->getNumPoints(), 2 * NANOWIRE_COUNT);
+            vec_control.resize(controls->getNumPoints(), ELECTRODE_COUNT);
             vec_duration.resize(controls->getNumPoints());
             for (ACADO::uint i = 0; i < states->getNumPoints() - 1; ++i) {
                 vec_state.row(i) = states->getVector(i + 1);
@@ -422,15 +412,15 @@ namespace acsr {
      * override DynamicSystem function
      * @return
      */
-        bool optimize(ACADO::DVector x0, ACADO::DVector xt,
+        bool optimize(Eigen::Matrix<double,2*NANOWIRE_COUNT,1> x0, Eigen::Matrix<double,2*NANOWIRE_COUNT,1> xt,
                       std::shared_ptr<ACADO::VariablesGrid> states,
                       std::shared_ptr<ACADO::VariablesGrid> controls) {
             USING_NAMESPACE_ACADO
             //auto nanowire_count = _nanowire_config->getNanowireCount();
 
             ///define ocp parameters
-            ACADO::DifferentialState x("", 2 * _n_wire, 1);
-            ACADO::Control u("", _control_dimension, 1);
+            ACADO::DifferentialState x("", 2 * NANOWIRE_COUNT, 1);
+            ACADO::Control u("", ELECTRODE_COUNT, 1);
             ACADO::Parameter T;
 
             ///horizontal steps
@@ -449,7 +439,7 @@ namespace acsr {
                 auto state = (x0+xt)/2;
 
                 Eigen::MatrixXd mat_E;
-                _field->getField(state, _current_height, mat_E, _n_wire);
+                _field->getField<NANOWIRE_COUNT>(state, _current_height, mat_E);
                 ACADO::DMatrix B = _mat_theta * mat_E * _em / _mu;
 
                 ///set differerntial equation
@@ -463,11 +453,11 @@ namespace acsr {
                 ocp.subjectTo(ACADO::AT_START, x == x0);
                 ocp.subjectTo(ACADO::AT_END, x == xt);
                 ///control constraints
-                for (int k = 0; k < _control_dimension; ++k) {
+                for (int k = 0; k < ELECTRODE_COUNT; ++k) {
                     ocp.subjectTo(0 <= u(k) <= 1);
                 }
                 ///state constraints
-                for (int n = 0; n < 2 * _n_wire; ++n) {
+                for (int n = 0; n < 2 * NANOWIRE_COUNT; ++n) {
                     ocp.subjectTo(_state_low_bound(n) <= x(n) <= _state_upper_bound(n));
                 }
                 ///maximum time
@@ -525,7 +515,7 @@ namespace acsr {
                             y_position(k) = curr_state(2 * k + 1);
                         }*/
 
-                        _field->getField(curr_state, _current_height, mat_E, _n_wire);
+                        _field->getField<NANOWIRE_COUNT>(curr_state, _current_height, mat_E);
 
                         ACADO::DVector mat_velocity = _mat_theta * mat_E * vec_u * _em / _mu;
                         curr_state += mat_velocity * _step_length;
@@ -556,22 +546,21 @@ namespace acsr {
 
     protected:
         const double MAX_VELOCITY = 1e-7;
-        std::vector<int> dominant_index;
 
         /***
          * override DynamicSystem function
          * @return
          */
-        bool validState(const Eigen::VectorXd &state) {
+        bool validState(const StateType &state) {
             //auto nanowire_count = _nanowire_config->getNanowireCount();
-            for (unsigned i = 0; i < _n_wire - 1; i++) {
-                for (unsigned j = i + 1; j < _n_wire; j++) {
+            for (unsigned i = 0; i < NANOWIRE_COUNT - 1; i++) {
+                for (unsigned j = i + 1; j < NANOWIRE_COUNT; j++) {
                     if ((state.segment(2 * i, 2) - state.segment(2 * j, 2)).norm() < _wire_radius) {
                         return false;
                     }
                 }
             }
-            for (int i = 0; i < _n_wire; i++) {
+            for (int i = 0; i < NANOWIRE_COUNT; i++) {
                 if (state[2 * i] <= _state_low_bound(0) || state[2 * i] >= _state_upper_bound(0)
                     || state[2 * i + 1] <= _state_low_bound(1) || state[2 * i + 1] >= _state_upper_bound(1))
                     return false;
@@ -580,7 +569,7 @@ namespace acsr {
         }
 
         void updateStepLength(){
-            auto max_theta_pt = std::max_element(_mat_theta.data(), _mat_theta.data() + 2 * _n_wire,
+            auto max_theta_pt = std::max_element(_mat_theta.data(), _mat_theta.data() + 2 * NANOWIRE_COUNT,
                                                  [](double &aa, double &bb) {
                                                      return (std::abs(aa) < std::abs(bb));
                                                  });
@@ -595,12 +584,12 @@ namespace acsr {
             _step_length = std::round(_step_length*10)/10.0;
         }
 
-        void setZetaPotential(const Eigen::VectorXd &zeta_potential) {
-            assert(zeta_potential.size() == 2*_n_wire);
+        void setZetaPotential(const StateType &zeta_potential) {
+            //assert(zeta_potential.size() == 2*NANOWIRE_COUNT);
             _mat_theta = zeta_potential.asDiagonal();
         }
 
-        void setHeight(const Eigen::VectorXd& height){
+        void setHeight(const Eigen::Matrix<double,NANOWIRE_COUNT,1>& height){
             _current_height = height;
         }
     };
