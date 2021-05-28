@@ -90,30 +90,23 @@ namespace acsr{
 
             if(parent->getTreeId()!=TreeId::forward || !std::static_pointer_cast<SSTTreeNodeType>(parent)->isActive())
                 return false;
-            bool return_value = false;
+            const int n=3;
             std::map<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>> quality_map;
-            StateType temp_state;
-            double temp_duration;
-
-            ///propagate M times and select a best node with least estimated solution cost
-            for(int i=0;i<PlannerConfig::blossomM;i++) {
-                if(!this->_run_flag)return false;
-                auto temp_control = this->_dynamic_system->randomControl();
-                auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
-                if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,
-                                                                   steps,temp_state,temp_duration)){
-                    return_value = true;
-                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::forward)] =
-                            PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION> {temp_state,temp_control,temp_duration};
-                }
+            std::mutex map_mutex;
+            std::vector<std::thread> thread_pool;
+            for(auto i=0;i<n-1;++i){
+                thread_pool.push_back(std::thread(&acsr::RefSST<STATE_DIMENSION,CONTROL_DIMENSION>::forwardBlossomThread,this,parent,PlannerConfig::blossomM/n,std::ref(quality_map),std::ref(map_mutex)));
             }
-            if(return_value){
-                int i = 0;
-                for(auto it = quality_map.rbegin();i<PlannerConfig::blossomN && it!=quality_map.rend();++it,++i){
-                    params.push_back(it->second);
-                }
+            forwardBlossomThread(parent,PlannerConfig::blossomM/n,quality_map,map_mutex);
+            for(auto&t:thread_pool){
+                if(t.joinable())t.join();
             }
-            return return_value;
+            if(quality_map.empty())return false;
+            int i = 0;
+            for(auto it = quality_map.rbegin();i<PlannerConfig::blossomN && it!=quality_map.rend();++it,++i){
+                params.push_back(it->second);
+            }
+            return true;
         }
 
         /***
@@ -128,30 +121,58 @@ namespace acsr{
 
             if(parent->getTreeId()!=TreeId::backward || !std::static_pointer_cast<SSTTreeNodeType>(parent)->isActive())
                 return false;
-            bool return_value = false;
-
-            StateType temp_state;
+            const int n=3;
+            //bool return_value = false;
             std::map<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>> quality_map;
+            std::mutex map_mutex;
+            std::vector<std::thread> thread_pool;
+            for(auto i=0;i<n-1;++i){
+                thread_pool.push_back(std::thread(&acsr::RefSST<STATE_DIMENSION,CONTROL_DIMENSION>::backwardBlossomThread,this,parent,PlannerConfig::blossomM/n,std::ref(quality_map),std::ref(map_mutex)));
+            }
+            backwardBlossomThread(parent,PlannerConfig::blossomM/n,quality_map,map_mutex);
+            for(auto&t:thread_pool){
+                if(t.joinable())t.join();
+            }
+            if(quality_map.empty())return false;
+            int i = 0;
+            for(auto it = quality_map.rbegin();i<PlannerConfig::blossomN && it!=quality_map.rend();++it,++i){
+                params.push_back(it->second);
+            }
+            return true;
+        }
+
+        void backwardBlossomThread(const TreeNodePtr& parent,int iterate_n,std::map<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& quality_map,std::mutex& map_mutex){
+            StateType temp_state;
+            //std::map<double,PropagateParameters> quality_map;
             double temp_duration;
 
-            for(int i=0;i<PlannerConfig::blossomM;i++) {
-                if(!this->_run_flag)return false;
+            for(int i=0;i<iterate_n;i++) {
+                if(!this->_run_flag)return;
                 auto temp_control = this->_dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
                 if (this->_dynamic_system->backwardPropagateBySteps(parent->getState(),temp_control,
-                                                                   steps,temp_state,temp_duration)){
-                    return_value = true;
+                                                                    steps,temp_state,temp_duration)){
+                    std::scoped_lock<std::mutex> lock(map_mutex);
                     quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::backward)] =
                             PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION> {temp_state,temp_control,temp_duration};
                 }
             }
-            if(return_value){
-                int i = 0;
-                for(auto it = quality_map.rbegin();i<PlannerConfig::blossomN && it!=quality_map.rend();++it,++i){
-                    params.push_back(it->second);
+        }
+
+        void forwardBlossomThread(const TreeNodePtr& parent,int iterate_n,std::map<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& quality_map,std::mutex& map_mutex){
+            StateType temp_state;
+            double temp_duration;
+            for(int i=0;i<iterate_n;i++) {
+                if(!this->_run_flag)return;
+                auto temp_control = this->_dynamic_system->randomControl();
+                auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
+                if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,
+                                                                   steps,temp_state,temp_duration)){
+                    std::scoped_lock<std::mutex> lock(map_mutex);
+                    quality_map[getQuality(parent->getCost() + temp_duration,temp_state,TreeId::forward)] =
+                            PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION> {temp_state,temp_control,temp_duration};
                 }
             }
-            return return_value;
         }
 
         StateType getRandomReferencePoint(){
@@ -179,7 +200,7 @@ namespace acsr{
             Eigen::VectorXd non_dominant_state(state.size()-2*_dominant_index.size());
 
             int j=0,k=0;
-            for(auto i=0;i<this->_dynamic_system->getRobotCount();++i){
+            for(auto i=0;i<STATE_DIMENSION/2;++i){
                 if(std::find(_dominant_index.begin(),_dominant_index.end(),i)!=_dominant_index.end()){
                     dominant_ref(2*j) = reference_state(2*i);
                     dominant_ref(2*j+1) = reference_state(2*i+1);
@@ -208,7 +229,7 @@ namespace acsr{
         }
 
     public:
-        explicit RefSST(std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,16>> dynamic_system):SST<STATE_DIMENSION,CONTROL_DIMENSION>(dynamic_system),
+        explicit RefSST(std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>> dynamic_system):SST<STATE_DIMENSION,CONTROL_DIMENSION>(dynamic_system),
                                                                         Planner<STATE_DIMENSION,CONTROL_DIMENSION>(dynamic_system){
         }
 
@@ -238,9 +259,9 @@ namespace acsr{
             reference_path->readFile("reference_path.txt");
 
             ///check dominant path
-            std::vector<double> length(this->_dynamic_system->getRobotCount(),0.0);
+            std::vector<double> length(STATE_DIMENSION/2,0.0);
             for(auto j=0;j<states.getNumPoints()-1;++j){
-                for(auto i=0;i<this->_dynamic_system->getRobotCount();++i){
+                for(auto i=0;i<STATE_DIMENSION/2;++i){
                     auto temp_length=(states(j,2*i)-states(j+1,2*i))*(states(j,2*i)-states(j+1,2*i))+
                                      (states(j,2*i+1)-states(j+1,2*i+1))*(states(j,2*i+1)-states(j+1,2*i+1));
                     length[i]+=temp_length;
@@ -252,7 +273,7 @@ namespace acsr{
             std::sort(length_with_index.begin(),length_with_index.end(),[](const auto& p1,const auto& p2){
                 return p1.second>p2.second;
             });
-            auto v = std::min(PlannerConfig::dominant_path_count,this->_dynamic_system->getRobotCount());
+            auto v = std::min(PlannerConfig::dominant_path_count,STATE_DIMENSION/2);
             for(auto i=0;i<v;++i)
                 _dominant_index.push_back(length_with_index[i].first);
         }

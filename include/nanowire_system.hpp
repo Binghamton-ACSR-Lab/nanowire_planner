@@ -73,8 +73,7 @@ namespace acsr {
         using StateType = Eigen::Matrix<double,2*NANOWIRE_COUNT,1>;
         using ControlType = Eigen::Matrix<double,ELECTRODE_COUNT,1>;
     private:
-        //int _n_wire;
-        //int _control_dimension = 16;
+
         std::atomic_bool _run_flag;
         std::shared_ptr<EpField> _field;
 
@@ -172,14 +171,6 @@ namespace acsr {
             _run_flag = false;
         }
 
-        size_t getControlDimension() const{
-            return ELECTRODE_COUNT;
-        }
-
-        size_t getStateDimension() const{
-            return 2*NANOWIRE_COUNT;
-        }
-
         /***
          * distance of two state
          * @param state1
@@ -249,10 +240,11 @@ namespace acsr {
         forwardPropagateBySteps(const StateType &init_state, const ControlType &control,
                                 int steps, StateType &result_state, double &duration) {
             Eigen::MatrixXd mat_E;
+            auto temp_mat_theta = _mat_theta * _em / _mu;
             result_state = init_state;
             for (auto i = 0; i < steps; ++i) {
                 _field->getField<NANOWIRE_COUNT>(result_state,_current_height, mat_E);
-                auto mat_velocity = _mat_theta * mat_E * control * _em / _mu;
+                auto mat_velocity = temp_mat_theta * mat_E * control;
                 result_state += _step_length * mat_velocity;
                 if (!validState(result_state))
                     return false;
@@ -289,9 +281,10 @@ namespace acsr {
 
             int step = 0;
             duration = 0;
+            auto temp_mat_theta = _mat_theta * _em / _mu;
             while (distance(init_state, result_state) < max_distance) {
                 _field->getField(result_state,_current_height, mat_E, NANOWIRE_COUNT);
-                auto mat_velocity = _mat_theta * mat_E * control * _em / _mu;
+                auto mat_velocity = temp_mat_theta * mat_E * control;
                 result_state += _step_length * mat_velocity;
                 if (!validState(result_state))
                     return false;
@@ -321,29 +314,8 @@ namespace acsr {
 
         /***
          * override DynamicSystem function
-         * @return
+         * @return always false since this system can't be redirect
          */
-         /*
-        virtual std::pair<std::vector<NodePtr>,NodePtr>
-        getNearNodeByRadiusAndNearest(const Eigen::VectorXd &state, const KdTreeType  &tree,
-                                      double radius)  {
-            auto it = spatial::euclidian_neighbor_begin(tree, state);
-            auto max_count = std::min(int(tree.size()), 20);
-            std::vector<NodePtr > near_nodes;
-            auto nearest_node = it->second;
-            for (auto i = 0; i < max_count; ++i) {
-                if (distance(state, it->second->getState()) < radius) {
-                    near_nodes.push_back(it->second);
-                    ++it;
-                }
-            }
-            return {near_nodes, nearest_node};
-        }*/
-
-        /***
-     * override DynamicSystem function
-     * @return always false since this system can't be redirect
-     */
         bool redirect(const StateType &start,
                       const StateType &target,
                       ControlType &controls,
@@ -353,29 +325,20 @@ namespace acsr {
         }
 
         /***
-     * override. Current always return empty vector. This function can be implemented.
-     * @param start
-     * @param target
-     * @return
-     */
+         * override. Current always return empty vector. This function can be implemented.
+         * @param start
+         * @param target
+         * @return
+         */
         ControlType getGuideControl(const StateType &start,
                                         const StateType &target)  {
             return ControlType();
         }
 
         /***
-     * override DynamicSystem function
-     * @return
-     */
-
-        int getRobotCount() {
-            return NANOWIRE_COUNT;
-        }
-
-        /***
-     * override DynamicSystem function
-     * @return
-     */
+         * override DynamicSystem function
+         * @return
+         */
         bool connect(const StateType &start, const StateType &target,
                      Eigen::MatrixXd &vec_state,
                      Eigen::MatrixXd &vec_control,
@@ -409,9 +372,9 @@ namespace acsr {
         }
 
         /***
-     * override DynamicSystem function
-     * @return
-     */
+         * override DynamicSystem function
+         * @return
+         */
         bool optimize(Eigen::Matrix<double,2*NANOWIRE_COUNT,1> x0, Eigen::Matrix<double,2*NANOWIRE_COUNT,1> xt,
                       std::shared_ptr<ACADO::VariablesGrid> states,
                       std::shared_ptr<ACADO::VariablesGrid> controls) {
@@ -501,35 +464,25 @@ namespace acsr {
 
                 double time_interval = algorithm.getObjectiveValue() / steps;
 
-                ///explore with nonlinear mat_E using the control from the optimize process
                 for (auto index = 0; index < steps; ++index) {
                     ACADO::DVector curr_state(states->getLastVector());
                     Eigen::MatrixXd mat_E;
                     auto vec_u = vg_controls.getVector(index);
 
                     controls->addVector(vec_u, current_time + time_point);
+                    auto temp_mat_theta = _mat_theta * _em / _mu;
                     while (current_time < (index + 1) * time_interval) {
-                        /*
-                        for (int k = 0; k < nanowire_count; k++) {
-                            x_position(k) = curr_state(2 * k);
-                            y_position(k) = curr_state(2 * k + 1);
-                        }*/
-
                         _field->getField<NANOWIRE_COUNT>(curr_state, _current_height, mat_E);
-
-                        ACADO::DVector mat_velocity = _mat_theta * mat_E * vec_u * _em / _mu;
+                        ACADO::DVector mat_velocity = temp_mat_theta * mat_E * vec_u;
                         curr_state += mat_velocity * _step_length;
                         current_time += _step_length;
-                        if(!_run_flag)return false;
-                        if (!validState(curr_state))
-                            return false;
+                        if(!_run_flag || !validState(curr_state))return false;
                     }
 
                     auto compare_vector = vg_states.getVector(index + 1);
 
                     if ((curr_state - compare_vector).norm() > PlannerConfig::goal_radius && index > 0)
                         break;
-
                     states->addVector(curr_state, current_time + time_point);
                 }
                 x0 = states->getLastVector();
@@ -593,8 +546,6 @@ namespace acsr {
             _current_height = height;
         }
     };
-
-
 }
 
 #endif //NANOWIREPLANNER_NANOWIRE_SYSTEM_HPP

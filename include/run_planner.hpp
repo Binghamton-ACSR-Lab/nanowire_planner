@@ -152,7 +152,9 @@ namespace acsr {
                 }else{
                     std::cout<<"planner is running\n Number of Node: ";
                     auto nodes_count = planner->getNumberOfNode();
+
                     std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
+                    std::cout<<planner->tree_add_cost<<'\t'<<planner->tree_remove_cost<<'\t'<<planner->tree_search_cost<<'\n';
                     if(planner->getBestCost()>1e6){
                         std::cout<<"no solution\n";
                     }else {

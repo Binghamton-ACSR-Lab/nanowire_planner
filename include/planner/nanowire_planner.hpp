@@ -123,6 +123,11 @@ namespace acsr {
         }
 
     public:
+
+        std::atomic<unsigned long> tree_add_cost {0};
+        std::atomic<unsigned long> tree_search_cost{0};
+        std::atomic<unsigned long> tree_remove_cost {0};
+
         Planner() = delete;
 
         /***
@@ -345,7 +350,7 @@ namespace acsr {
 
             node = _best_goal.second;
             backward_durations.push_back(0);
-            backward_control.push_back(ControlType(_dynamic_system->getControlDimension()));
+            backward_control.push_back(ControlType());
             while (node) {
                 backward_states.push_back(node->getState());
                 backward_control.push_back(node->getEdgeControl());
@@ -476,7 +481,7 @@ namespace acsr {
        virtual void notifyPlannerStart(const std::string& planner_name,const std::string& image_name,const VariablesGrid& reference) {
            for(auto observer: planner_start_observers){
                observer->onPlannerStart(planner_name,
-                                        _dynamic_system->getRobotCount(),
+                                        STATE_DIMENSION/2,
                                         _init_state,_target_state,
                                         reference,
                                         PlannerConfig::bidirection,

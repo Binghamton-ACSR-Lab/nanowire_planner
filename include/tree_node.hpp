@@ -6,11 +6,6 @@
 #define NANOWIREPLANNER_TREE_NODE_HPP
 
 #include <list>
-//#include <spatial/spatial.hpp>
-//#include <spatial/point_multiset.hpp>
-//#include <spatial/point_multimap.hpp>
-//#include <spatial/neighbor_iterator.hpp>
-//#include <spatial/metric.hpp>
 #include <unordered_map>
 
 namespace acsr {
@@ -23,21 +18,8 @@ namespace acsr {
         connection
     };
 
-/***
- * denote where the tree node
- */
- /*
-    enum TreeNodeState {
-        not_in_tree = 0,
-        in_tree
-    };
-*/
-
     template <int CONTROL_DIMENSION>
     using TreeEdge =std::pair<Eigen::Matrix<double,CONTROL_DIMENSION,1>,double>;
-
-    //template <int STATE_DIMENSION>
-    //class ProxNode;
 
     template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class SSTTreeNode;
@@ -48,16 +30,6 @@ namespace acsr {
     template <int STATE_DIMENSION>
     class Node;
 
-    /*
-    template <int STATE_DIMENSION>
-    using NodePtr = std::shared_ptr<Node<STATE_DIMENSION>>;
-
-    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
-    using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
-
-    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
-    using SSTTreeNodePtr = std::shared_ptr <SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;*/
-    //using ProxNodePtr = std::shared_ptr <ProxNode>;
 
     template <int STATE_DIMENSION>
     class Node{
@@ -100,8 +72,8 @@ namespace acsr {
          * @param index
          * @return
          */
-        double operator[](size_t index) const{
-            if(index>_state.size())
+        const double operator[](size_t index) const{
+            if(index>STATE_DIMENSION)
                 throw(std::out_of_range("index exceeds state range."));
             return _state[index];
         }
@@ -201,22 +173,6 @@ namespace acsr {
         }
 
         /***
-         * set the state of the node,e.g. where it is
-         * @param nodeState
-
-        void setTreeNodeState(TreeNodeState nodeState) {
-            _tree_node_state = nodeState;
-        }*/
-
-        /***
-         * get the state of the node, e.g. where it is
-         * @return
-
-        TreeNodeState getTreeNodeState() const {
-            return _tree_node_state;
-        }*/
-
-        /***
          * add a child
          * @param child a child node
          */
@@ -290,7 +246,6 @@ namespace acsr {
     class SSTTreeNode : public TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>{
 
     protected:
-        //ProxNodePtr _prox_node;
         bool _active_state;
 
     public:
@@ -307,22 +262,6 @@ namespace acsr {
         SSTTreeNode(TreeId id,const Eigen::Matrix<double,STATE_DIMENSION,1>& pt): TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>(id,pt){
 
         }
-
-        /***
-         * set prox node
-         * @param node
-
-        void setProxNode(ProxNodePtr node){
-            _prox_node = node;
-        }*/
-
-        /***
-         * get prox node
-         * @return
-
-        ProxNodePtr getProxNode(){
-            return _prox_node;
-        }*/
 
         /***
          * check whether this sstnode active
@@ -346,7 +285,6 @@ namespace acsr {
         ~SSTTreeNode() override =default;
     };
 
-    //using KdTreeType = spatial::point_multimap<0, Eigen::VectorXd, std::shared_ptr<Node>>;
 
 }
 
