@@ -87,14 +87,14 @@ namespace acsr {
                 const StateType& init_state,
                 const StateType& target_state,
                 const ACADO::VariablesGrid& reference_path,
-                bool bidirectional,
-                bool optimization,
-                double stop_value,
-                double goal_radius,
-                double step_size,
-                int min_steps,int max_steps, double sst_delta_near, double sst_delta_drain,
-                double optimization_distance,
-                int m,int n,int a,double b,
+                //bool bidirectional,
+                //bool optimization,
+                //double stop_value,
+                //double goal_radius,
+                //double step_size,
+                //int min_steps,int max_steps, double sst_delta_near, double sst_delta_drain,
+                //double optimization_distance,
+                //int m,int n,int a,double b,
                 const std::string& image_name
         ) override{
             original_image = createImage();

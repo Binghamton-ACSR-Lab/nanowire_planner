@@ -20,29 +20,18 @@ namespace acsr{
 
     template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class RefSST: public SST<STATE_DIMENSION,CONTROL_DIMENSION>, virtual public Planner<STATE_DIMENSION,CONTROL_DIMENSION>{
-        //using Planner<STATE_DIMENSION>::_dynamic_system;
-        //using Planner<STATE_DIMENSION>::_best_goal;
-        //using Planner<STATE_DIMENSION>::_init_state;
-        //using Planner<STATE_DIMENSION>::_target_state;
-        //using Planner<STATE_DIMENSION>::_best_cost;
-        //using Planner<STATE_DIMENSION>::_run_flag;
-        //using Planner<STATE_DIMENSION>::_planner_connection;
-        //using SST<STATE_DIMENSION>::optimize_set;
-        //using SST<STATE_DIMENSION>::addToTree;
 
         using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
         using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
 
-        using TreeNodeType = TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>;
-        using SSTTreeNodeType = SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>;
+        using TreeNodeType = TreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>;
+        using SSTTreeNodeType = SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>;
 
-        using NodePtr = std::shared_ptr<Node<STATE_DIMENSION>>;
-        using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
-        using SSTTreeNodePtr = std::shared_ptr <SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
+        using NodePtr = std::shared_ptr<Node<double,STATE_DIMENSION>>;
+        using TreeNodePtr = std::shared_ptr <TreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>;
+        using SSTTreeNodePtr = std::shared_ptr <SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>;
 
     protected:
-
-
         /***
          * select a node to explore, unlike in SST or RRT, this process is not stochastic. we select a node with least estimated solution cost
          * @param tree_id
@@ -54,15 +43,17 @@ namespace acsr{
             parent = nullptr;
             if(p<PlannerConfig::search_p){
                 auto point = getRandomReferencePoint();
-                auto near = this->getNearNodeByRadiusAndNearest(point,tree_id,PlannerConfig::sst_delta_near);
-                parent = std::static_pointer_cast<TreeNodeType>(near.second);
-                if(!near.first.empty()) {
-                    auto it = std::min_element(near.first.begin(), near.first.end(),
+                auto near = this->getNearNodeByRadius(point,tree_id,PlannerConfig::sst_delta_near);
+                if(!near.empty()) {
+                    auto it = std::min_element(near.begin(), near.end(),
                                                [](const NodePtr &node1,const NodePtr &node2) {
                                                    return std::static_pointer_cast<TreeNodeType>(node1)->getCost() < std::static_pointer_cast<TreeNodeType>(node2)->getCost();
                                                });
                     parent = std::static_pointer_cast<TreeNodeType>(*it);
+                }else{
+                    parent = std::static_pointer_cast<TreeNodeType>(this->getNearNodeByCount(point,tree_id,1).front());
                 }
+
             }else{
                 auto point = this->_dynamic_system->randomState();
                 auto near = this->getNearNodeByCount(point,tree_id,10);
@@ -122,7 +113,6 @@ namespace acsr{
             if(parent->getTreeId()!=TreeId::backward || !std::static_pointer_cast<SSTTreeNodeType>(parent)->isActive())
                 return false;
             const int n=3;
-            //bool return_value = false;
             std::map<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>> quality_map;
             std::mutex map_mutex;
             std::vector<std::thread> thread_pool;
@@ -237,9 +227,9 @@ namespace acsr{
         RefSST(const RefSST&) = delete;
 
         ~RefSST() override{
-            //this->forward_tree.clear();
-            //this->backward_tree.clear();
-            //this->optimize_set.clear();
+            this->forward_rtree.clear();
+            this->backward_rtree.clear();
+            this->optimize_set.clear();
         }
 
         /***
@@ -285,7 +275,7 @@ namespace acsr{
             ///select a node to be explored in forward tree
             TreeNodePtr parent= nullptr;
             if(!searchSelection(TreeId::forward,parent))return;
-            if(!std::static_pointer_cast<SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>(parent)->isActive())
+            if(!std::static_pointer_cast<SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>(parent)->isActive())
                 return;
             std::vector<PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>> params;
             if (forwardBlossom(parent,params)){
@@ -318,12 +308,12 @@ namespace acsr{
                 return;
             TreeNodePtr parent;
             searchSelection(TreeId::backward,parent);
-            if(!std::static_pointer_cast<SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>(parent)->isActive())return;
+            if(!std::static_pointer_cast<SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>(parent)->isActive())return;
 
             std::vector<PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>> params;
             if (backwardBlossom(parent,params)){
                 ///add parent to close map
-                if(parent==nullptr || !std::static_pointer_cast<SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>(parent)->isActive())
+                if(parent==nullptr || !std::static_pointer_cast<SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>(parent)->isActive())
                     return;
                 for(auto& param:params){
                     auto new_node = this->addToTree(TreeId::backward,parent,param.state,param.control,param.duration);

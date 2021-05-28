@@ -180,10 +180,7 @@ namespace acsr {
             for (auto &client:clients) {
                 client->send(s.c_str(), s.length());
             }
-
         }
-
-
     };
 }
 

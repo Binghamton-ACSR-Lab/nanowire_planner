@@ -9,7 +9,7 @@
 namespace acsr{
 
     template <int STATE_DIMENSION,int CONTROL_DIMENSION>
-    class iSST: public SST<STATE_DIMENSION,CONTROL_DIMENSION>,virtual public Planner<STATE_DIMENSION,CONTROL_DIMENSION>{
+    class iSST: virtual public SST<STATE_DIMENSION,CONTROL_DIMENSION>,virtual public Planner<STATE_DIMENSION,CONTROL_DIMENSION>{
         //using Planner<STATE_DIMENSION>::_dynamic_system;
         //using Planner<STATE_DIMENSION>::_best_goal;
         //using Planner<STATE_DIMENSION>::_init_state;
@@ -25,12 +25,12 @@ namespace acsr{
         using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
         using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
 
-        using TreeNodeType = TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>;
-        using SSTTreeNodeType = SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>;
+        using TreeNodeType = TreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>;
+        using SSTTreeNodeType = SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>;
 
-        using NodePtr = std::shared_ptr<Node<STATE_DIMENSION>>;
-        using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
-        using SSTTreeNodePtr = std::shared_ptr <SSTTreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
+        using NodePtr = std::shared_ptr<Node<double,STATE_DIMENSION>>;
+        using TreeNodePtr = std::shared_ptr <TreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>;
+        using SSTTreeNodePtr = std::shared_ptr <SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>;
 
 
     protected:

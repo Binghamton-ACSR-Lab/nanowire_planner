@@ -56,33 +56,19 @@ namespace acsr {
     class PlannerStartObserver
     {
         using STATE_TYPE = Eigen::Matrix<double,STATE_DIMENSION,1>;
-        using CONTROL_TYPE = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
     public:
         PlannerStartObserver()=default;
         PlannerStartObserver(const PlannerStartObserver&) = delete;
         PlannerStartObserver& operator=(const PlannerStartObserver&) = delete;
 
         /***
-         * @brief notify obserser when planner start
+         *
          * @param type
          * @param robot_count
          * @param init_state
          * @param target_state
-         * @param bidrectional
-         * @param optimization
-         * @param stop_type
-         * @param stop_value
-         * @param goal_radius
-         * @param step_size
-         * @param min_steps
-         * @param max_steps
-         * @param sst_delta_near
-         * @param sst_delta_drain
-         * @param optimization_distance
-         * @param m
-         * @param n
-         * @param a
-         * @param b
+         * @param reference_path
+         * @param image_name
          */
         virtual void onPlannerStart(
                 std::string type,
@@ -90,23 +76,8 @@ namespace acsr {
                 const STATE_TYPE& init_state,
                 const STATE_TYPE& target_state,
                 const ACADO::VariablesGrid& reference_path,
-                bool bidirectional,
-                bool optimization,
-                double stop_value,
-                double goal_radius,
-                double step_size,
-                int min_steps,
-                int max_steps,
-                double sst_delta_near,
-                double sst_delta_drain,
-                double optimization_distance,
-                int m,
-                int n,
-                int dominant_path_count,
-                double quality_decrease_factor,
                 const std::string& image_name
         ) =0;
-
         virtual ~PlannerStartObserver()=default;
     };
 

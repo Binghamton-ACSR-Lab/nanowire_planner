@@ -70,15 +70,15 @@ namespace acsr {
                 const StateType &_start_state,
                 const StateType &_target_state,
                 const ACADO::VariablesGrid& reference_path,
-                bool bidrectional,
-                bool optimization,
+                //bool bidrectional,
+                //bool optimization,
                 //std::string stop_type,
-                double stop_value,
-                double goal_radius,
-                double step_size,
-                int min_steps, int max_steps, double sst_delta_near, double sst_delta_drain,
-                double optimization_distance,
-                int m, int n, int a, double b,
+                //double stop_value,
+                //double goal_radius,
+                //double step_size,
+                //int min_steps, int max_steps, double sst_delta_near, double sst_delta_drain,
+                //double optimization_distance,
+                //int m, int n, int a, double b,
                 const std::string& image_name
         ) override {
             start_time = system_clock::now();

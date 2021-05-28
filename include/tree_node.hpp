@@ -18,23 +18,23 @@ namespace acsr {
         connection
     };
 
-    template <int CONTROL_DIMENSION>
-    using TreeEdge =std::pair<Eigen::Matrix<double,CONTROL_DIMENSION,1>,double>;
+    template <class T,int CONTROL_DIMENSION>
+    using TreeEdge =std::pair<Eigen::Matrix<T,CONTROL_DIMENSION,1>,T>;
 
-    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    template <class T,int STATE_DIMENSION,int CONTROL_DIMENSION>
     class SSTTreeNode;
 
-    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    template <class T,int STATE_DIMENSION,int CONTROL_DIMENSION>
     class TreeNode;
 
-    template <int STATE_DIMENSION>
+    template <class T,int STATE_DIMENSION>
     class Node;
 
 
-    template <int STATE_DIMENSION>
+    template <class T,int STATE_DIMENSION>
     class Node{
     protected:
-        Eigen::Matrix<double,STATE_DIMENSION,1> _state;
+        Eigen::Matrix<T,STATE_DIMENSION,1> _state;
     public:
         /***
          * delete defaut constructor
@@ -45,7 +45,7 @@ namespace acsr {
          * costructor with an inital state
          * @param _state
          */
-        explicit Node(const Eigen::Matrix<double,STATE_DIMENSION,1>& state):_state(state){
+        explicit Node(const Eigen::Matrix<T,STATE_DIMENSION,1>& state):_state(state){
         }
 
         /***
@@ -57,7 +57,7 @@ namespace acsr {
         }
 
         /***
-         * override operator =
+         * operator =
          * @param _node
          * @return
          */
@@ -72,7 +72,18 @@ namespace acsr {
          * @param index
          * @return
          */
-        const double operator[](size_t index) const{
+        const T operator[](size_t index) const{
+            if(index>STATE_DIMENSION)
+                throw(std::out_of_range("index exceeds state range."));
+            return _state[index];
+        }
+
+        /***
+         * operator []
+         * @param index
+         * @return
+         */
+        T& operator[](size_t index) {
             if(index>STATE_DIMENSION)
                 throw(std::out_of_range("index exceeds state range."));
             return _state[index];
@@ -87,20 +98,20 @@ namespace acsr {
          * get the state
          * @return
          */
-        virtual Eigen::Matrix<double,STATE_DIMENSION,1> getState() const{
+        virtual Eigen::Matrix<T,STATE_DIMENSION,1> getState() const{
             return _state;
         }
 
     };
 
-    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
-    class TreeNode: public Node<STATE_DIMENSION> {
-        using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
+    template <class T,int STATE_DIMENSION,int CONTROL_DIMENSION>
+    class TreeNode: public Node<T,STATE_DIMENSION> {
+        using TreeNodePtr = std::shared_ptr <TreeNode<T,STATE_DIMENSION,CONTROL_DIMENSION>>;
     protected:
         std::weak_ptr <TreeNode> _parent;
         std::list<TreeNodePtr> _children;
-        TreeEdge<CONTROL_DIMENSION>  _edge;
-        double _cost;
+        TreeEdge<T,CONTROL_DIMENSION>  _edge;
+        T _cost;
         TreeId _tree_id;
         //TreeNodeState _tree_node_state;
 
@@ -127,7 +138,7 @@ namespace acsr {
          * @param id: tree id
          * @param pt: node state
          */
-        explicit TreeNode(TreeId id, const Eigen::Matrix<double,STATE_DIMENSION,1> &pt):Node<STATE_DIMENSION>(pt),_tree_id(id),_cost(0.0) {
+        explicit TreeNode(TreeId id, const Eigen::Matrix<T,STATE_DIMENSION,1> &pt):Node<T,STATE_DIMENSION>(pt),_tree_id(id),_cost(0.0) {
 
         }
 
@@ -160,7 +171,7 @@ namespace acsr {
         /***
          * set node  cost
          */
-        void setCost(double cost) {
+        void setCost(T cost) {
             _cost = cost;
         }
 
@@ -168,7 +179,7 @@ namespace acsr {
          * get node cost
          * @return
          */
-        double getCost() const {
+        T getCost() const {
             return _cost;
         }
 
@@ -215,7 +226,7 @@ namespace acsr {
          * set tree edge
          * @param _edge
          */
-        void setEdge(const TreeEdge<CONTROL_DIMENSION> &edge) {
+        void setEdge(const TreeEdge<T,CONTROL_DIMENSION> &edge) {
             _edge = edge;
         }
 
@@ -223,7 +234,7 @@ namespace acsr {
          * get the control of the edge
          * @return
          */
-        Eigen::Matrix<double,CONTROL_DIMENSION,1> getEdgeControl() const {
+        Eigen::Matrix<T,CONTROL_DIMENSION,1> getEdgeControl() const {
             return _edge.first;
         }
 
@@ -231,19 +242,19 @@ namespace acsr {
          * get the duration of the edge
          * @return
          */
-        double getEdgeDuration() const {
+        T getEdgeDuration() const {
             return _edge.second;
         }
 
-        bool operator==(const TreeNode<STATE_DIMENSION,CONTROL_DIMENSION> &node) const {
+        bool operator==(const TreeNode<T,STATE_DIMENSION,CONTROL_DIMENSION> &node) const {
             return this->_state == node._state && _edge == node._edge && _tree_id == node._tree_id &&
                    _cost == node._cost;
         }
 
     };
 
-    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
-    class SSTTreeNode : public TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>{
+    template <class T,int STATE_DIMENSION,int CONTROL_DIMENSION>
+    class SSTTreeNode : public TreeNode<T,STATE_DIMENSION,CONTROL_DIMENSION>{
 
     protected:
         bool _active_state;
@@ -259,7 +270,7 @@ namespace acsr {
          * @param id
          * @param pt
          */
-        SSTTreeNode(TreeId id,const Eigen::Matrix<double,STATE_DIMENSION,1>& pt): TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>(id,pt){
+        SSTTreeNode(TreeId id,const Eigen::Matrix<T,STATE_DIMENSION,1>& pt): TreeNode<T,STATE_DIMENSION,CONTROL_DIMENSION>(id,pt){
 
         }
 

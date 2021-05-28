@@ -20,8 +20,8 @@ namespace acsr {
     struct PlannerConnection{
         using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
         using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
-        using NodePtr = std::shared_ptr<Node<STATE_DIMENSION>>;
-        using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
+        using NodePtr = std::shared_ptr<Node<double,STATE_DIMENSION>>;
+        using TreeNodePtr = std::shared_ptr <TreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>;
     public:
 
         /***
@@ -72,17 +72,14 @@ namespace acsr {
      template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class Planner {
         using StateType = Eigen::Matrix<double,STATE_DIMENSION,1>;
-        using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;;
-        using NodePtr = std::shared_ptr<Node<STATE_DIMENSION>>;
-        using TreeNodePtr = std::shared_ptr <TreeNode<STATE_DIMENSION,CONTROL_DIMENSION>>;
+        using ControlType = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
+        using TreeNodePtr = std::shared_ptr <TreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>;
     protected:
-        //const int _state_dimension;
         std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>> _dynamic_system; ///nanowire system
         std::shared_ptr<PlannerConnection<STATE_DIMENSION,CONTROL_DIMENSION>> _planner_connection;/// connecting segment
 
         StateType _init_state;///start state
         StateType _target_state;///target state
-
         double _goal_radius;///goal radius
 
         double _best_cost = std::numeric_limits<double>::max();
@@ -124,10 +121,6 @@ namespace acsr {
 
     public:
 
-        std::atomic<unsigned long> tree_add_cost {0};
-        std::atomic<unsigned long> tree_search_cost{0};
-        std::atomic<unsigned long> tree_remove_cost {0};
-
         Planner() = delete;
 
         /***
@@ -137,7 +130,6 @@ namespace acsr {
         explicit Planner(std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>> system):_dynamic_system(system),
             _run_flag(false),
             _goal_radius(0.0){
-
         }
 
         virtual ~Planner() = default;
@@ -245,15 +237,19 @@ namespace acsr {
             _is_optimized_connect = optimized_connect;
         }
 
+        /***
+         * forward process
+         * @param state parent state
+         * @param controls controls
+         * @param duration duration
+         * @return new state
+         */
         virtual StateType forward(const StateType& state,const ControlType& controls,double duration) = 0;
-
-
 
         /***
          * register a solution update observer
          * @param observer inherits from SolutionUpdateObserver
          */
-
        virtual void registerSolutionUpdateObserver(const std::shared_ptr<SolutionUpdateObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
            this->solution_update_observers.push_back(observer);
        }
@@ -262,7 +258,6 @@ namespace acsr {
          * unregister a solution update observer
          * @param observer inherits from SolutionUpdateObserver
          */
-
        virtual void unregisterSolutionUpdateObserver(const std::shared_ptr<SolutionUpdateObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
            this->solution_update_observers.erase(std::find(solution_update_observers.begin(),solution_update_observers.end(),observer));
        }
@@ -271,7 +266,6 @@ namespace acsr {
           * register a node added observer
           * @param observer inherits from NodeAddedObserver
           */
-
         virtual void registerNodeAddedObserver(const std::shared_ptr<NodeAddedObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
             node_added_observers.push_back(observer);
         }
@@ -280,7 +274,6 @@ namespace acsr {
          * unregister a node added observer
          * @param observer inherits from NodeAddedObserver
          */
-
         virtual void unregisterSolutionUpdateObserver(const std::shared_ptr<NodeAddedObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
             node_added_observers.erase(std::find(node_added_observers.begin(),node_added_observers.end(),observer));
         }
@@ -291,7 +284,6 @@ namespace acsr {
          * register a planner started observer
          * @param observer inherits from PlannerStartObserver
          */
-
        virtual void registerPlannerStartObserver(const std::shared_ptr<PlannerStartObserver<STATE_DIMENSION,CONTROL_DIMENSION>>& observer){
            this->planner_start_observers.push_back(observer);
        }
@@ -483,22 +475,7 @@ namespace acsr {
                observer->onPlannerStart(planner_name,
                                         STATE_DIMENSION/2,
                                         _init_state,_target_state,
-                                        reference,
-                                        PlannerConfig::bidirection,
-                                        PlannerConfig::optimization,
-                                        PlannerConfig::total_time,
-                                        PlannerConfig::goal_radius,
-                                        PlannerConfig::integration_step,
-                                        PlannerConfig::min_time_steps,
-                                        PlannerConfig::max_time_steps,
-                                        PlannerConfig::sst_delta_near,
-                                        PlannerConfig::sst_delta_drain,
-                                        PlannerConfig::optimization_distance,
-                                        PlannerConfig::blossomM,
-                                        PlannerConfig::blossomN,
-                                        PlannerConfig::dominant_path_count,
-                                        PlannerConfig::quality_decrease_factor,
-                                        image_name);
+                                        reference,image_name);
            }
        }
 

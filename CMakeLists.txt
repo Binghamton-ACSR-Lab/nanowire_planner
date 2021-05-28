@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 
 include_directories(include include/utility include/planner include/observer include/global_route)
-find_package(Boost COMPONENTS system program_options filesystem regex REQUIRED)
+find_package(Boost COMPONENTS system program_options filesystem REQUIRED)
 find_package(Threads)
 
 file(GLOB source_files
@@ -25,10 +25,7 @@ target_link_libraries( NanowirePlanner
         pthread
         ${CMAKE_THREAD_LIBS_INIT}
         ${Boost_FILESYSTEM_LIBRARY}
-        ${Boost_THREAD_LIBRARY}
         ${Boost_SYSTEM_LIBRARY}
-        ${Boost_REGEX_LIBRARY}
         ${Boost_PROGRAM_OPTIONS_LIBRARY}
-        ${Boost_DATE_TIME_LIBRARY}
         SQLiteCpp sqlite3
         )

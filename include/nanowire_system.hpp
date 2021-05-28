@@ -347,17 +347,15 @@ namespace acsr {
             ACADO::DVector x0(start);
             ACADO::DVector xt(target);
 
-
             auto states = std::make_shared<ACADO::VariablesGrid>();//=new VariablesGrid();
             auto controls = std::make_shared<ACADO::VariablesGrid>();//=new VariablesGrid();
 
             states->addVector(x0, 0);
-
-
-
             if (!optimize(x0, xt, states, controls)) {
                 return false;
             }
+
+            //std::cout<<states->getNumPoints()<<'\t'<<controls->getNumPoints()<<'\n';
 
             vec_state.resize(controls->getNumPoints(), 2 * NANOWIRE_COUNT);
             vec_control.resize(controls->getNumPoints(), ELECTRODE_COUNT);
