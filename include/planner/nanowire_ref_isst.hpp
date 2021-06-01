@@ -205,6 +205,8 @@ namespace acsr{
                     k++;
                 }
             }
+            auto z = std::exp(-time);
+            value = z/(dominant_ref-dominant_state).norm();
 
             if(time <= max_time){
                 auto q = (time/max_time-1.0)*PlannerConfig::quality_factor;

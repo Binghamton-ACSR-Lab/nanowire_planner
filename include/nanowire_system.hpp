@@ -335,6 +335,14 @@ namespace acsr {
             return ControlType();
         }
 
+        int getFieldDimension() const{
+            return _field_dimension;
+        }
+
+        Eigen::Matrix<double,NANOWIRE_COUNT,1> getNanowireHeight() const{
+            return _current_height;
+        }
+
         /***
          * override DynamicSystem function
          * @return
@@ -543,6 +551,9 @@ namespace acsr {
         void setHeight(const Eigen::Matrix<double,NANOWIRE_COUNT,1>& height){
             _current_height = height;
         }
+
+
+
     };
 }
 
