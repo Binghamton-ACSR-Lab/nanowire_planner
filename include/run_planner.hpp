@@ -143,6 +143,7 @@ namespace acsr {
                         std::cout.flush();
 
                         std::this_thread::sleep_for (std::chrono::seconds(5));
+                        database_observer->onNodeUpdate(planner->getNumberOfNode().first,planner->getNumberOfNode().second);
                         auto stop = std::chrono::system_clock::now();
                         if(std::chrono::duration_cast<std::chrono::seconds>(stop-start).count()>PlannerConfig::total_time){
                             break;

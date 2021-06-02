@@ -161,7 +161,7 @@ namespace acsr {
             query.bind(25,height_string);
 
             solution_table = "solution_" + start_time_string;
-            std::string node_table = start_time_string + "_node";
+            node_table = "node_" + start_time_string;
 
             query.bind(26, solution_table);
             query.bind(27, node_table);
@@ -182,6 +182,17 @@ namespace acsr {
                 db.exec(str);
             } catch (SQLite::Exception &e) {
                 std::cout << "Create Solution Table Error\n";
+                std::cout << e.what();
+                return;
+            }
+
+            str = "CREATE TABLE  " + node_table +
+                              "  (id INTEGER PRIMARY KEY AUTOINCREMENT, time real, node1 real, node2 real)";
+
+            try {
+                db.exec(str);
+            } catch (SQLite::Exception &e) {
+                std::cout << "Create Node Table Error\n";
                 std::cout << e.what();
                 return;
             }
@@ -223,6 +234,26 @@ namespace acsr {
             }
         }
 
+        void onNodeUpdate(unsigned node1, unsigned node2){
+            auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now() - start_time).count();
+
+            std::string query_string = "INSERT INTO " + node_table + " (time,node1,node2) VALUES(?,?,?)";
+            SQLite::Statement query(db, query_string);
+
+            query.bind(1, (double) stamp / 1000.0);
+            query.bind(2, node1);
+            query.bind(3, node2);
+
+            try {
+                query.exec();
+            } catch (SQLite::Exception &e) {
+                std::cout << "Insert Node Error\n";
+                std::cout << e.what();
+                return;
+            }
+        }
+
         void setNanowireSystem(const NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>& system){
             nanowire_system=system;
         }
@@ -231,6 +262,7 @@ namespace acsr {
         SQLite::Database db;
         std::chrono::system_clock::time_point start_time;
         std::string solution_table;
+        std::string node_table;
         std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>> nanowire_system;
     };
 }

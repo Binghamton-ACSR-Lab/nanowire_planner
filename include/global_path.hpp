@@ -58,6 +58,7 @@ namespace acsr {
                     ref_time.setTime(i, multiply * ref_time.getTime(i));
                 }
             }
+            return true;
         }
 
         /***

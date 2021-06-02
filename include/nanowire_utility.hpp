@@ -75,6 +75,8 @@ namespace acsr{
             case PlannerType::e_Ref_iSST:
                 if(bidirectional)return "Bi-Ref-iSST";
                 else return "Ref-iSST";
+            default:
+                return "";
         }
     }
 

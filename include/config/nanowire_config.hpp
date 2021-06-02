@@ -100,6 +100,7 @@ namespace acsr {
                 else if(field_dimension==3)
                     return "E_Map_4by4_100V_CC600_E_3D_1mm.txt";
             }
+            return std::string();
         }
 
         /***
@@ -411,7 +412,6 @@ namespace acsr {
                                 fil.write(reinterpret_cast<char*>(value3d[i][j][m]), layers*sizeof(float));
                     }
                     fil.close();
-                    return true;
                 }
             }else{ ///if exist binary file, read this file directly
                 if(_dimension==2){
@@ -440,6 +440,7 @@ namespace acsr {
                     fil.close();
                 }
             }
+            return true;
         }
 
         /***
