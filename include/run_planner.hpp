@@ -12,6 +12,7 @@
 #include "config/system_config.hpp"
 #include "planner_builder.hpp"
 #include "svg_observer.hpp"
+#include "database_observer.hpp"
 #include "http_observer.hpp"
 #include "tcp_server.hpp"
 #include "boost/algorithm/string.hpp"
@@ -51,6 +52,8 @@ namespace acsr {
             svg_observer = std::make_shared<SvgObserver<2*NANOWIRE_COUNT,16>>();
             http_observer->run(callback);
 
+
+
             ///set tcp_server as message displayer
             message_displayers.push_back(tcp_server);
         }
@@ -59,86 +62,97 @@ namespace acsr {
          * performance test
          * @param wire_count nanowire count
          */
-        void performanceTest(int wire_count) {
-            nanowire_system = std::make_shared<NanowireSystem<NANOWIRE_COUNT,16>>(wire_count,_field_dimension);
-            http_observer->reset();
-            //const int state_dimension = 2*wire_count;
-            auto planner = PlannerBuilder::create<2*NANOWIRE_COUNT>(PlannerConfig::planner,nanowire_system);
+        void performanceTest(int running_number,std::vector<double> init_states,std::vector<double> target_states) {
+            _field_dimension = 2;
+            nanowire_system = std::make_shared<NanowireSystem<NANOWIRE_COUNT, 16>>(_field_dimension);
 
-            ///necessary setting
-            planner->setStartState(PlannerConfig::init_state);
-            planner->setTargetState(PlannerConfig::goal_state);
-            planner->setGoalRadius(PlannerConfig::goal_radius);
-            //planner->setRandomSeed(time(NULL));
 
-            svg_observer->setNanowireConfig(wire_count);
+            ///set parameters for nanowire system
+            Eigen::Matrix<double, NANOWIRE_COUNT, 1> height_vec;
+            Eigen::Matrix<double, 2 * NANOWIRE_COUNT, 1> zeta_vec;
+            zeta_vec.setConstant(1.0);
+            height_vec.setConstant(100);
+            nanowire_system->init(zeta_vec, height_vec);
+            nanowire_system->reset();
+            database_observer = std::make_shared<DatabaseObserver<2*NANOWIRE_COUNT,16>>(nanowire_system);
+            std::vector<PlannerType> planner_types = {PlannerType::e_Ref_iSST, PlannerType::e_iSST, PlannerType::e_SST};
+            for (auto j = 0; j < 6; ++j) {
+                PlannerConfig::planner = planner_types[j];
+                PlannerConfig::bidirection = j%2;
+                for (auto i = 0; i < running_number; ++i) {
+                    http_observer->reset();
+                    ///create a new planner
+                    planner = PlannerBuilder::create<2 * NANOWIRE_COUNT, 16>(PlannerConfig::planner, nanowire_system);
+                    planner->setStartState(
+                            Eigen::Map<Eigen::Matrix<double, 2 * NANOWIRE_COUNT, 1>>(init_states.data()));
+                    planner->setTargetState(
+                            Eigen::Map<Eigen::Matrix<double, 2 * NANOWIRE_COUNT, 1>>(target_states.data()));
+                    planner->setGoalRadius(PlannerConfig::goal_radius);
 
-            planner->registerSolutionUpdateObserver(svg_observer);
-            planner->registerPlannerStartObserver(svg_observer);
-            planner->registerSolutionUpdateObserver(http_observer);
-            planner->registerPlannerStartObserver(http_observer);
-            planner->registerNodeAddedObserver(svg_observer);
-            planner->setup();
-            std::cout<<"Goal Radius: "<<PlannerConfig::goal_radius<<std::endl;
-            std::thread forward_thread,reverse_thread,connecting_thread;
+                    svg_observer->setNanowireConfig(NANOWIRE_COUNT);
+                    planner->registerSolutionUpdateObserver(svg_observer);
+                    planner->registerPlannerStartObserver(svg_observer);
+                    planner->registerSolutionUpdateObserver(http_observer);
+                    planner->registerPlannerStartObserver(http_observer);
+                    planner->registerNodeAddedObserver(svg_observer);
+                    planner->registerSolutionUpdateObserver(tcp_server);
 
-            ///forward step threadcc
-            forward_run_flag = true;
-            forward_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::forwardExplore,this);
+                    planner->registerSolutionUpdateObserver(database_observer);
+                    planner->registerPlannerStartObserver(database_observer);
 
-            ///reverse step thread
-            if(PlannerConfig::bidirection){
-                reverse_run_flag = true;
-                planner->setBiTreePlanner(true);
-                reverse_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::reverseExplore,this);
-            }
+                    planner->setup();
+                    //std::cout<<"Goal Radius: "<<Config::goal_radius<<std::endl;
 
-            ///connecting thread
-            if(PlannerConfig::optimization){
-                optimize_run_flag = true;
-                planner->setOptimizedConnect(true);
-                connecting_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::connecting,this);
-            }
+                    std::thread forward_thread, reverse_thread, connecting_thread;
 
-            auto start = std::chrono::steady_clock::now();
+                    ///forward step threadcc
+                    forward_run_flag = true;
+                    forward_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::forwardExplore, this);
+                    forward_thread.detach();
+                    if (PlannerConfig::bidirection) {
+                        reverse_run_flag = true;
+                        planner->setBiTreePlanner(true);
+                        reverse_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::reverseExplore, this);
+                        reverse_thread.detach();
+                    }
 
-            VariablesGrid vg;
-            vg.read("reference_path.txt");
-            planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner),"img",vg);
-            while(!exit_flag){
-                std::cout<<"planner is running\n Number of Node: ";
-                auto nodes_count = planner->getNumberOfNode();
-                std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
-                std::cout<<"Solution Quality: "<<planner->getBestCost()<<'\n';
-                std::cout.flush();
-                auto stop = std::chrono::steady_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop-start);
-                std::cout<<"duration: " << duration.count()<<"\n";
-                if(duration.count()>PlannerConfig::total_time){
-                    exit_flag = true;
-                    planner->stop();
-                    break;
+                    if (PlannerConfig::optimization) {
+                        optimize_run_flag = true;
+                        planner->setOptimizedConnect(true);
+                        connecting_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::connecting, this);
+                        connecting_thread.detach();
+                    }
+                    VariablesGrid vg;
+                    vg.read("reference_path.txt");
+                    run_flag = true;
+                    planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner,PlannerConfig::bidirection), "img", vg);
+
+                    auto start = std::chrono::system_clock::now();
+                    while(true){
+
+                        std::cout<<"planner is running\n Number of Node: ";
+                        auto nodes_count = planner->getNumberOfNode();
+
+                        std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
+                        //std::cout<<planner->tree_add_cost<<'\t'<<planner->tree_remove_cost<<'\t'<<planner->tree_search_cost<<'\n';
+                        if(planner->getBestCost()>1e6){
+                            std::cout<<"no solution\n";
+                        }else {
+                            std::cout << "Solution Quality: " << planner->getBestCost() << '\n';
+                        }
+                        std::cout.flush();
+
+                        std::this_thread::sleep_for (std::chrono::seconds(5));
+                        auto stop = std::chrono::system_clock::now();
+                        if(std::chrono::duration_cast<std::chrono::seconds>(stop-start).count()>PlannerConfig::total_time){
+                            break;
+                        }
+                    }
+
+
+
                 }
-                svg_observer->update();
-                std::this_thread::sleep_for (std::chrono::seconds(5));
             }
-
-            reverse_run_flag = false;
-            forward_run_flag = false;
-            optimize_run_flag = false;
-
-
-            if(forward_thread.joinable())
-                forward_thread.join();
-            if(planner->isBiTreePlanner()) {
-                if(reverse_thread.joinable())
-                    reverse_thread.join();
-            }
-            if(PlannerConfig::optimization){
-                if(connecting_thread.joinable())
-                    connecting_thread.join();
-            }
-            std::cout<<"Planner Finished\n";
         }
 
         /***
@@ -513,7 +527,7 @@ namespace acsr {
             VariablesGrid vg;
             vg.read("reference_path.txt");
             run_flag = true;
-            planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner),"img",vg);
+            planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner,PlannerConfig::bidirection),"img",vg);
 
         }
 
@@ -573,7 +587,7 @@ namespace acsr {
 
             VariablesGrid vg;
             vg.read("reference_path.txt");
-            planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner),"img",vg);
+            planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner,PlannerConfig::bidirection),"img",vg);
         }
 
 
@@ -598,6 +612,7 @@ namespace acsr {
         ///observers
         std::shared_ptr<SvgObserver<2*NANOWIRE_COUNT,16>> svg_observer;
         std::shared_ptr<HttpServer<2*NANOWIRE_COUNT,16>> http_observer;
+        std::shared_ptr<DatabaseObserver<2*NANOWIRE_COUNT,16>> database_observer;
         //std::shared_ptr<DatabaseObserver> db_observer;
 
         //int _n_wires;

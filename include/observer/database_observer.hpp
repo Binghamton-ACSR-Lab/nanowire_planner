@@ -21,14 +21,15 @@ namespace acsr {
         using CONTROL_TYPE = Eigen::Matrix<double,CONTROL_DIMENSION,1>;
 
     public:
+
         /***
          * constructor. Initial database
          */
-        DatabaseObserver(const NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>& system) : nanowire_system(system),db("plannerDB.db", SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE),
+        DatabaseObserver(const std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>>& system) : nanowire_system(system),db("plannerDB.db", SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE),
                              SolutionUpdateObserver<STATE_DIMENSION, CONTROL_DIMENSION>(), PlannerStartObserver<STATE_DIMENSION,CONTROL_DIMENSION>() {
             SQLite::Statement query(db, "create table if not exists trajectory ("
                                         "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                                        "time TEXT NOT NULL, "
+                                        "time TEXT NOT NULL,"
                                         "nanowire_count INTEGER NOT NULL,"
                                         "init_state TEXT NOT NULL,"
                                         "target_state TEXT NOT NULL,"
@@ -44,15 +45,15 @@ namespace acsr {
                                         "sst_delta_near REAL,"
                                         "sst_delta_drain REAL,"
                                         "optimization_distance REAL,"
-                                        "dominant_path_count REAL"
+                                        "dominant_path_count REAL,"
                                         "blossom_m INTEGER,"
                                         "blossom_n INTEGER,"
                                         "quality_factor REAL,"
                                         "quality_decrease_factor REAL,"
-                                        "search_p REAL"
-                                        "field_type TEXT"
-                                        "filed_dimension REAL"
-                                        "nanowire_height TEXT"
+                                        "search_p REAL,"
+                                        "field_type TEXT,"
+                                        "filed_dimension REAL,"
+                                        "nanowire_height TEXT,"
                                         "solution_update_table_name TEXT NOT NULL,"
                                         "nodes_update_table_name TEXT NOT NULL"
                                         ")");
@@ -87,7 +88,7 @@ namespace acsr {
             auto start_time_string = ss.str();
 
             SQLite::Statement query(db, "INSERT INTO trajectory ("
-                                        "time, "
+                                        "time,"
                                         "nanowire_count,"
                                         "init_state,"
                                         "target_state,"
@@ -103,17 +104,17 @@ namespace acsr {
                                         "sst_delta_near,"
                                         "sst_delta_drain,"
                                         "optimization_distance,"
-                                        "dominant_path_count"
+                                        "dominant_path_count,"
                                         "blossom_m,"
                                         "blossom_n,"
                                         "quality_factor,"
                                         "quality_decrease_factor,"
-                                        "search_p"
-                                        "field_type"
-                                        "filed_dimension"
-                                        "nanowire_height"
+                                        "search_p,"
+                                        "field_type,"
+                                        "filed_dimension,"
+                                        "nanowire_height,"
                                         "solution_update_table_name,"
-                                        "nodes_update_table_name"
+                                        "nodes_update_table_name) "
                                         "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
 
             query.bind(1, start_time_string);
@@ -230,7 +231,7 @@ namespace acsr {
         SQLite::Database db;
         std::chrono::system_clock::time_point start_time;
         std::string solution_table;
-        NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION> nanowire_system;
+        std::shared_ptr<NanowireSystem<STATE_DIMENSION/2,CONTROL_DIMENSION>> nanowire_system;
     };
 }
 #endif //NANOWIREPLANNER_DATABASE_OBSERVER_HPP

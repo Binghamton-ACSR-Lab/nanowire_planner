@@ -64,14 +64,17 @@ namespace acsr{
      * @param planner_type planner type
      * @return planner string
      */
-    static std::string getPlannerString(PlannerType planner_type){
+    static std::string getPlannerString(PlannerType planner_type,bool bidirectional){
         switch (planner_type) {
             case PlannerType::e_SST:
-                return "SST";
+                if(bidirectional)return "Bi-SST";
+                else return "SST";
             case PlannerType::e_iSST:
-                return "iSST";
+                if(bidirectional)return "Bi-iSST";
+                else return "iSST";
             case PlannerType::e_Ref_iSST:
-                return "Ref_iSST";
+                if(bidirectional)return "Bi-Ref-iSST";
+                else return "Ref-iSST";
         }
     }
 

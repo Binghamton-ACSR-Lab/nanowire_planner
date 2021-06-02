@@ -4,7 +4,7 @@ project(NanowirePlanner VERSION 0.1.0)
 set(CMAKE_CXX_STANDARD 17)
 
 
-include_directories(include include/utility include/planner include/observer include/global_route)
+include_directories(include include/utility include/planner include/observer include/global_route /usr/local/include/acado)
 find_package(Boost COMPONENTS system program_options filesystem REQUIRED)
 find_package(Threads)
 
