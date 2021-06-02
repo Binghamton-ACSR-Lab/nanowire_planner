@@ -242,11 +242,13 @@ namespace acsr{
             if(tree_id == TreeId::forward){
                 std::unique_lock<std::mutex> lock(forward_tree_mutex);
                 forward_rtree.template query(bgi::nearest(state,20) && bgi::satisfies([&](const NodePtr& node){
+                    if(node == nullptr)return false;
                     return (node->getState()-state).norm()<radius;
                 }),std::back_inserter(vec));
             }else if(tree_id == TreeId::backward){
                 std::unique_lock<std::mutex> lock(backward_tree_mutex);
                 backward_rtree.template query(bgi::nearest(state,20) && bgi::satisfies([&](const NodePtr& node){
+                    if(node == nullptr)return false;
                     return (node->getState()-state).norm()<radius;
                 }),std::back_inserter(vec));
             }
