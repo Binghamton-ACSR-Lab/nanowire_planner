@@ -14,6 +14,13 @@ namespace acsr{
     namespace bg = boost::geometry;
     namespace bgi = boost::geometry::index;
 
+    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
+    struct PropagateParameters{
+        Eigen::Matrix<double,STATE_DIMENSION,1> state;
+        Eigen::Matrix<double,CONTROL_DIMENSION,1> control;
+        double duration;
+    } ;
+
     /***
      * hash function for key = IVector
      */
@@ -114,10 +121,14 @@ namespace acsr{
             if(previous_node){
                 previous_node->setActive(false);
                 removePointFromSearchTree(previous_node);
-                while( previous_node->getChildren().empty() && !previous_node->isActive() && !this->isInSolutionPath(previous_node)){
-                    auto next = previous_node->getParent();
-                    removeLeaf(previous_node);
-                    previous_node = std::static_pointer_cast<SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>(next);
+                auto best_goal = tree_id==TreeId::forward?_best_goal.first:_best_goal.second;
+                if(previous_node!=best_goal) {
+                    while (previous_node->getChildren().empty() && !previous_node->isActive()) {
+                        auto next = previous_node->getParent();
+                        removeLeaf(previous_node);
+                        previous_node = std::static_pointer_cast<SSTTreeNode<double, STATE_DIMENSION, CONTROL_DIMENSION>>(
+                                next);
+                    }
                 }
             }
 
@@ -176,13 +187,13 @@ namespace acsr{
             if(node->getTreeId()==TreeId::forward){
                 std::scoped_lock<std::mutex> lock1(forward_tree_mutex);
                 //forward_rtree.insert({node->getState(),node});
-                forward_rtree.insert(node);
+                forward_rtree.insert({node->getState(),node});
                 this->_number_of_nodes.first+=1;
             }
             else if(node->getTreeId()==TreeId::backward){
                 std::scoped_lock<std::mutex> lock1(backward_tree_mutex);
                 //backward_rtree.insert({node->getState(),node});
-                backward_rtree.insert(node);
+                backward_rtree.insert({node->getState(),node});
                 this->_number_of_nodes.second+=1;
             }
 
@@ -198,14 +209,12 @@ namespace acsr{
 
             if(node->getTreeId()==TreeId::forward){
                 std::scoped_lock<std::mutex> lock1(forward_tree_mutex);
-                //auto p = forward_rtree.remove(std::make_pair(node->getState(),node));
-                auto p = forward_rtree.remove(node);
+                auto p = forward_rtree.remove({node->getState(),node});
                 this->_number_of_nodes.first -= p;
             }
             else if(node->getTreeId()==TreeId::backward){
                 std::scoped_lock<std::mutex> lock1(backward_tree_mutex);
-                //auto p = backward_rtree.remove(std::make_pair(node->getState(),node));
-                auto p = backward_rtree.remove(node);
+                auto p = backward_rtree.remove({node->getState(),node});
                 this->_number_of_nodes.second -= p;
             }
         }
@@ -218,14 +227,16 @@ namespace acsr{
          * @return
          */
         virtual std::vector<NodePtr> getNearNodeByCount(const StateType & state,TreeId tree_id,int count){
-            std::vector<NodePtr> vec;
+            std::vector<std::pair<StateType,NodePtr>> temp_vec;
             if(tree_id == TreeId::forward){
-                std::unique_lock<std::mutex> lock(forward_tree_mutex);
-                forward_rtree.query(bgi::nearest(state,count),std::back_inserter(vec));
+                std::scoped_lock<std::mutex> lock(forward_tree_mutex);
+                forward_rtree.template query(bgi::nearest(state,count),std::back_inserter(temp_vec));
             }else if(tree_id == TreeId::backward){
-                std::unique_lock<std::mutex> lock(backward_tree_mutex);
-                backward_rtree.template query(bgi::nearest(state,count),std::back_inserter(vec));
+                std::scoped_lock<std::mutex> lock(backward_tree_mutex);
+                backward_rtree.template query(bgi::nearest(state,count),std::back_inserter(temp_vec));
             }
+            std::vector<NodePtr> vec;
+            for(auto& t:temp_vec)vec.push_back(t.second);
             return vec;
         }
 
@@ -240,17 +251,40 @@ namespace acsr{
         getNearNodeByRadius(const StateType& state,TreeId tree_id,double radius){
             std::vector<NodePtr> vec;
             if(tree_id == TreeId::forward){
-                std::unique_lock<std::mutex> lock(forward_tree_mutex);
-                forward_rtree.template query(bgi::nearest(state,20) && bgi::satisfies([&](const NodePtr& node){
-                    if(node == nullptr)return false;
-                    return (node->getState()-state).norm()<radius;
-                }),std::back_inserter(vec));
+                std::scoped_lock<std::mutex> lock(forward_tree_mutex);
+                /*forward_rtree.template query(bgi::nearest(state,20) && bgi::satisfies([&](const NodePtr& node){
+                    return bg::distance(node,state)<radius;
+                }),std::back_inserter(vec));*/
+                for ( auto it = forward_rtree.qbegin(bgi::nearest(state, 20)) ;
+                      it != forward_rtree.qend() ; ++it )
+                {
+                    auto n = std::static_pointer_cast<SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>(it->second);
+                    if(n == nullptr)continue;
+                    if(!(n->isActive()))forward_rtree.remove(*it);
+                    else{
+                        if((n->getState()-state).norm()<radius)
+                            vec.push_back(it->second);
+                    }
+                }
             }else if(tree_id == TreeId::backward){
-                std::unique_lock<std::mutex> lock(backward_tree_mutex);
+                std::scoped_lock<std::mutex> lock(backward_tree_mutex);
+                /*
                 backward_rtree.template query(bgi::nearest(state,20) && bgi::satisfies([&](const NodePtr& node){
                     if(node == nullptr)return false;
+                    if(node->getState().data() == nullptr)return false;
                     return (node->getState()-state).norm()<radius;
-                }),std::back_inserter(vec));
+                }),std::back_inserter(vec));*/
+                for ( auto it = backward_rtree.qbegin(bgi::nearest(state, 20)) ;
+                      it != backward_rtree.qend() ; ++it )
+                {
+                    auto n = std::static_pointer_cast<SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>(it->second);
+                    if(n== nullptr)continue;
+                    if(!(n->isActive()))backward_rtree.remove(*it);
+                    else{
+                        if((n->getState()-state).norm()<radius)
+                            vec.push_back(it->second);
+                    }
+                }
             }
             return vec;
         }
@@ -294,6 +328,8 @@ namespace acsr{
             if(node->getParent()){
                 node->getParent()->removeChild(node);
             }
+            //node->setActive(false);
+            //removePointFromSearchTree(node);
         }
 
         /***
@@ -302,8 +338,8 @@ namespace acsr{
          */
         virtual void branchBound(TreeNodePtr node){
             auto children = node->getChildren();
-
-            if(node->getCost() > _best_cost){
+            auto temp_target = node->getTreeId()==TreeId::forward?_target_state:_init_state;
+            if(node->getCost() + this->_dynamic_system->getHeuristic(node->getState(),temp_target)  > _best_cost){
                 removeBranch(node);
             }else{
                 for(auto &n:children){
@@ -332,10 +368,10 @@ namespace acsr{
         }
 
     protected:
-        //bgi::rtree< std::pair<StateType,NodePtr>, bgi::quadratic<32> > forward_rtree;
-        //bgi::rtree< std::pair<StateType,NodePtr>, bgi::quadratic<32> > backward_rtree;
-        bgi::rtree< NodePtr, bgi::quadratic<32> > forward_rtree;
-        bgi::rtree< NodePtr, bgi::quadratic<32> > backward_rtree;
+        bgi::rtree< std::pair<StateType,NodePtr>, bgi::quadratic<32> > forward_rtree;
+        bgi::rtree< std::pair<StateType,NodePtr>, bgi::quadratic<32> > backward_rtree;
+        //bgi::rtree< NodePtr, bgi::quadratic<32> > forward_rtree;
+        //bgi::rtree< NodePtr, bgi::quadratic<32> > backward_rtree;
 
         std::mutex forward_tree_mutex;
         std::mutex backward_tree_mutex;
@@ -541,8 +577,8 @@ namespace acsr{
                 //std::cout<<connect_states.size()<<'\t'<<connect_controls.size()<<'\t'<<connect_durations.size()<<'\n';
                 _planner_connection = std::make_shared<PlannerConnection<STATE_DIMENSION,CONTROL_DIMENSION>>(this->_best_goal,connect_states,connect_controls,connect_durations);
                 this->updateBestCost();
-                branchBound(this->_root);
-                branchBound(this->_goal);
+                branchBound(_root);
+                branchBound(_goal);
                 this->notifySolutionUpdate();
             }
         }

@@ -45,7 +45,7 @@ namespace acsr {
          * costructor with an inital state
          * @param _state
          */
-        explicit Node(const Eigen::Matrix<T,STATE_DIMENSION,1>& state):_state(state){
+        explicit Node(const Eigen::Matrix<T,STATE_DIMENSION,1>& state):_state(std::move(state)){
         }
 
         /***

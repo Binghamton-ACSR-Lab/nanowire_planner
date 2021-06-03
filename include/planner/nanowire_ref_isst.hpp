@@ -11,12 +11,6 @@
 #include <math.h>
 namespace acsr{
 
-    template <int STATE_DIMENSION,int CONTROL_DIMENSION>
-    struct PropagateParameters{
-        Eigen::Matrix<double,STATE_DIMENSION,1> state;
-        Eigen::Matrix<double,CONTROL_DIMENSION,1> control;
-        double duration;
-    } ;
 
     template <int STATE_DIMENSION,int CONTROL_DIMENSION>
     class RefSST: public SST<STATE_DIMENSION,CONTROL_DIMENSION>, virtual public Planner<STATE_DIMENSION,CONTROL_DIMENSION>{

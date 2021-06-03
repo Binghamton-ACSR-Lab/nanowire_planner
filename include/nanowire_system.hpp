@@ -73,7 +73,7 @@ namespace acsr {
         using StateType = Eigen::Matrix<double,2*NANOWIRE_COUNT,1>;
         using ControlType = Eigen::Matrix<double,ELECTRODE_COUNT,1>;
     private:
-
+        std::atomic<double> MAX_VELOCITY{1e-9};
         std::atomic_bool _run_flag;
         std::shared_ptr<EpField> _field;
 
@@ -245,6 +245,9 @@ namespace acsr {
             for (auto i = 0; i < steps; ++i) {
                 _field->getField<NANOWIRE_COUNT>(result_state,_current_height, mat_E);
                 auto mat_velocity = temp_mat_theta * mat_E * control;
+                if(mat_velocity.norm()/NANOWIRE_COUNT>MAX_VELOCITY){
+                    MAX_VELOCITY = mat_velocity.norm()/NANOWIRE_COUNT;
+                }
                 result_state += _step_length * mat_velocity;
                 if (!validState(result_state))
                     return false;
@@ -286,6 +289,9 @@ namespace acsr {
                 _field->getField(result_state,_current_height, mat_E, NANOWIRE_COUNT);
                 auto mat_velocity = temp_mat_theta * mat_E * control;
                 result_state += _step_length * mat_velocity;
+                if(mat_velocity.norm()/NANOWIRE_COUNT>MAX_VELOCITY){
+                    MAX_VELOCITY = mat_velocity.norm()/NANOWIRE_COUNT;
+                }
                 if (!validState(result_state))
                     return false;
             }
@@ -309,7 +315,7 @@ namespace acsr {
      */
         double getHeuristic(const StateType &state1, const StateType &state2)  {
             ///1200e-6/100 is the max velocity;
-            return maxDistance(state1, state2) /1e-5;
+            return maxDistance(state1, state2) /MAX_VELOCITY;
         }
 
         /***
@@ -393,7 +399,7 @@ namespace acsr {
             ACADO::Parameter T;
 
             ///horizontal steps
-            double steps = 20;
+            double steps = 15;
             x.clearStaticCounters();
             u.clearStaticCounters();
             T.clearStaticCounters();
@@ -504,7 +510,7 @@ namespace acsr {
         }
 
     protected:
-        const double MAX_VELOCITY = 1e-7;
+
 
         /***
          * override DynamicSystem function

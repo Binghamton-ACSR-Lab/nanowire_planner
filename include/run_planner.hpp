@@ -75,10 +75,10 @@ namespace acsr {
             nanowire_system->init(zeta_vec, height_vec);
             nanowire_system->reset();
             database_observer = std::make_shared<DatabaseObserver<2*NANOWIRE_COUNT,16>>(nanowire_system);
-            std::vector<PlannerType> planner_types = {PlannerType::e_Ref_iSST, PlannerType::e_iSST, PlannerType::e_SST};
+            std::vector<PlannerType> planner_types = {PlannerType::e_iSST, PlannerType::e_Ref_iSST, PlannerType::e_SST};
             for (auto j = 0; j < 6; ++j) {
                 PlannerConfig::planner = planner_types[j];
-                PlannerConfig::bidirection = j%2;
+                PlannerConfig::bidirection = !(j%2);
                 for (auto i = 0; i < running_number; ++i) {
                     http_observer->reset();
                     ///create a new planner
