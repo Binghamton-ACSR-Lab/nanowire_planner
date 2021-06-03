@@ -69,16 +69,16 @@ namespace acsr{
          * @param duration store temp duration
          * @return true if blossom process success
          */
-        bool forwardBlossom(const SSTTreeNodePtr & parent,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>& params){
-
+        bool forwardBlossom(const SSTTreeNodePtr & parent,std::vector<PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& params_vecs){
             if(parent->getTreeId()!=TreeId::forward || !parent->isActive())
                 return false;
-
+            params_vecs.clear();
             const int n=3;
             std::vector<std::thread> thread_pool;
-            std::vector<std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>> heuristic_vec(n,{1e6,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>()});
+            std::mutex map_mutex;
+            std::vector<std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>> heuristic_map(n,{1e6,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>()});
             for(auto i=0;i<n-1;++i){
-                thread_pool.push_back(std::thread(&acsr::iSST<STATE_DIMENSION,CONTROL_DIMENSION>::forwardBlossomThread,this,parent,PlannerConfig::blossomM/n,std::ref(heuristic_vec[i])));
+                thread_pool.push_back(std::thread(&acsr::iSST<STATE_DIMENSION,CONTROL_DIMENSION>::forwardBlossomThread,this,parent,PlannerConfig::blossomM/n,std::ref(heuristic_map[i])));
             }
             ///propagate M times and select a best node with least estimated solution cost
             StateType temp_state;
@@ -92,9 +92,9 @@ namespace acsr{
                                                                    steps,temp_state,temp_duration)){
                     //auto d = temp_duration + this->_dynamic_system->getHeuristic(temp_state,this->_goal->getState());
                     auto d = this->_dynamic_system->getHeuristic(temp_state,this->_goal->getState());
-                    if(d<heuristic_vec[n-1].first){
-                        heuristic_vec[n-1].first = d;
-                        heuristic_vec[n-1].second = PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION> {temp_state,temp_control,temp_duration};
+                    if(d<heuristic_map[n-1].first){
+                        heuristic_map[n-1].first = d;
+                        heuristic_map[n-1].second = PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION> {temp_state,temp_control,temp_duration};
                     }
                 }
             }
@@ -102,12 +102,11 @@ namespace acsr{
                 if(t.joinable())t.join();
             }
 
-            auto it = std::min_element(heuristic_vec.begin(),heuristic_vec.end(),[](const std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& p1,
-                    const std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& p2){
-                return p1.first<p2.first;
-            });
-            if(it->first>0.9e6)return false;
-            params=it->second;
+            for(auto& v : heuristic_map){
+                if(v.first<0.9e6){
+                    params_vecs.push_back(std::move(v.second));
+                }
+            }
             return true;
         }
 
@@ -119,14 +118,15 @@ namespace acsr{
          * @param duration store temp duration
          * @return true if blossom process success
          */
-        bool backwardBlossom(const SSTTreeNodePtr& parent,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>& params){
+        bool backwardBlossom(const SSTTreeNodePtr& parent,std::vector<PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& params_vec){
             if(parent->getTreeId()!=TreeId::backward || !parent->isActive())
                 return false;
             const int n=3;
+            params_vec.clear();
             std::vector<std::thread> thread_pool;
-            std::vector<std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>> heuristic_vec(n,{1e6,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>()});
+            std::vector<std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>> heuristic_map(n,{1e6,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>()});
             for(auto i=0;i<n-1;++i){
-                thread_pool.push_back(std::thread(&acsr::iSST<STATE_DIMENSION,CONTROL_DIMENSION>::backwardBlossomThread,this,parent,PlannerConfig::blossomM/n,std::ref(heuristic_vec[i])));
+                thread_pool.push_back(std::thread(&acsr::iSST<STATE_DIMENSION,CONTROL_DIMENSION>::backwardBlossomThread,this,parent,PlannerConfig::blossomM/n,std::ref(heuristic_map[i])));
             }
             ///propagate M times and select a best node with least estimated solution cost
             StateType temp_state;
@@ -138,10 +138,10 @@ namespace acsr{
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
                 if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,
                                                                    steps,temp_state,temp_duration)){
-                    auto d = this->_dynamic_system->getHeuristic(temp_state,this->_goal->getState());
-                    if(d<heuristic_vec[n-1].first){
-                        heuristic_vec[n-1].first = d;
-                        heuristic_vec[n-1].second = PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION> {temp_state,temp_control,temp_duration};
+                    auto d = this->_dynamic_system->getHeuristic(temp_state,this->_root->getState());
+                    if(d<heuristic_map[n-1].first){
+                        heuristic_map[n-1].first = d;
+                        heuristic_map[n-1].second = PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION> {temp_state,temp_control,temp_duration};
                     }
                 }
             }
@@ -149,12 +149,16 @@ namespace acsr{
                 if(t.joinable())t.join();
             }
 
-            auto it = std::min_element(heuristic_vec.begin(),heuristic_vec.end(),[](const std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& p1,
-                                                                                    const std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& p2){
+            std::sort(heuristic_map.begin(),heuristic_map.end(),[](const std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& p1,
+                      const std::pair<double,PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>>& p2){
                 return p1.first<p2.first;
             });
-            if(it->first>0.9e6)return false;
-            params=it->second;
+
+            for(auto& v : heuristic_map){
+                if(v.first<0.9e6){
+                    params_vec.push_back(std::move(v.second));
+                }
+            }
             return true;
         }
 
@@ -223,17 +227,29 @@ namespace acsr{
             //ControlType control;
             //double duration;
             ///cast the node to sst type
-            PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION> params;
-
+            std::vector<PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>> params_vec;
             auto sst_parent = std::dynamic_pointer_cast<SSTTreeNodeType>(parent);
-
             ///perform blossom, until it fails
-            while (forwardBlossom(sst_parent,params)){
+            while (forwardBlossom(sst_parent,params_vec)){
+                if(params_vec.empty())return;
                 if(sst_parent== nullptr)return;
-                auto new_node = this->addToTree(TreeId::forward,sst_parent,params.state,params.control,params.duration);
+                for(auto i=1;i<params_vec.size();++i){
+                    auto params = params_vec[i];
+                    auto new_node = this->addToTree(TreeId::forward,sst_parent,params_vec[i].state,params_vec[i].control,params_vec[i].duration);
+                    this->checkConnection(new_node);
+                    if(PlannerConfig::show_node && new_node!= nullptr){
+                        std::thread t([this,params](){
+                            this->notifyNodeAdded(params.state,TreeId::forward);
+                        });
+                        t.detach();
+                    }
+                }
+
+                auto new_node = this->addToTree(TreeId::forward,sst_parent,params_vec[0].state,params_vec[0].control,params_vec[0].duration);
                 this->checkConnection(new_node);
                 if(PlannerConfig::show_node && new_node!= nullptr){
-                    std::thread t([this,&params](){
+                    auto params = params_vec[0];
+                    std::thread t([this,params](){
                         this->notifyNodeAdded(params.state,TreeId::forward);
                     });
                     t.detach();
@@ -260,14 +276,30 @@ namespace acsr{
             //StateType state;
             //ControlType control;
             //double duration;
-            PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION> params;
+            std::vector<PropagateParameters<STATE_DIMENSION,CONTROL_DIMENSION>> params_vec;
             auto sst_parent = std::dynamic_pointer_cast<SSTTreeNodeType>(parent);
-            while (backwardBlossom(sst_parent,params)){
-                auto new_node = this->addToTree(TreeId::backward,sst_parent,params.state,params.control,params.duration);
+
+            while (backwardBlossom(sst_parent,params_vec)){
+                if(params_vec.empty())return;
+                for(auto i=1;i<params_vec.size();++i) {
+                    auto params = params_vec[i];
+                    auto new_node = this->addToTree(TreeId::backward, sst_parent, params_vec[i].state, params_vec[i].control,
+                                                    params_vec[i].duration);
+                    this->checkConnection(new_node);
+                    if (PlannerConfig::show_node && new_node != nullptr) {
+                        std::thread t([this, params]() {
+                            this->notifyNodeAdded(params.state, TreeId::backward);
+                        });
+                        t.detach();
+                    }
+                }
+                auto new_node = this->addToTree(TreeId::backward, sst_parent, params_vec[0].state, params_vec[0].control,
+                                                params_vec[0].duration);
                 this->checkConnection(new_node);
-                if(PlannerConfig::show_node && new_node!= nullptr){
-                    std::thread t([this,&params](){
-                        this->notifyNodeAdded(params.state,TreeId::backward);
+                if (PlannerConfig::show_node && new_node != nullptr) {
+                    auto params = params_vec[0];
+                    std::thread t([this, params]() {
+                        this->notifyNodeAdded(params.state, TreeId::backward);
                     });
                     t.detach();
                 }
