@@ -29,11 +29,18 @@ namespace acsr{
     {
         std::size_t operator()(const Eigen::Matrix<int,STATE_DIMENSION,1> & k) const
         {
+            size_t seed = 0;
+            for (size_t i = 0; i < STATE_DIMENSION; ++i) {
+                auto elem = *(k.data() + i);
+                seed ^= std::hash<int>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            }
+            return seed;
+            /*
             auto v = std::hash<int>()(k(0));
             for(auto i=1;i<STATE_DIMENSION;++i){
                 v = (v<< 4) ^ std::hash<int>()(k(i));
             }
-            return v;
+            return v;*/
         }
     };
 
@@ -103,8 +110,10 @@ namespace acsr{
             auto& map = tree_id==TreeId::forward?forward_prox_map:backward_prox_map;
             auto iv = _dynamic_system->getGrid(state);
             SSTTreeNodePtr previous_node = nullptr;
-            if(map.find(iv)!=map.end() && !map[iv].expired())
-                previous_node = map[iv].lock();
+            if(map.find(iv)!=map.end() ) {
+                if(!(map[iv].expired()))
+                    previous_node = map[iv].lock();
+            }
             if(previous_node
                && previous_node->getCost() < parent->getCost() + duration)
                 return nullptr;
@@ -402,13 +411,13 @@ namespace acsr{
          * destructor
          */
         ~SST() override{
-            forward_rtree.clear();
-            forward_rtree.clear();
-            optimize_set.clear();
-            forward_prox_map.clear();
-            backward_prox_map.clear();
-            _root = nullptr;
-            _goal = nullptr;
+            //forward_rtree.clear();
+            //forward_rtree.clear();
+            //optimize_set.clear();
+            //forward_prox_map.clear();
+            //backward_prox_map.clear();
+            //_root = nullptr;
+            //_goal = nullptr;
         }
 
         /***

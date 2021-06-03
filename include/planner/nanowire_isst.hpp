@@ -85,7 +85,7 @@ namespace acsr{
             double temp_duration;
 
             for(int i=0;i<PlannerConfig::blossomM/n;i++) {
-                if(!this->_run_flag)return false;
+                if(!this->_run_flag)break;
                 auto temp_control = this->_dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
                 if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,
@@ -107,6 +107,7 @@ namespace acsr{
                     params_vecs.push_back(std::move(v.second));
                 }
             }
+            if(!this->_run_flag)return false;
             return true;
         }
 
@@ -133,7 +134,7 @@ namespace acsr{
             double temp_duration;
 
             for(int i=0;i<PlannerConfig::blossomM/n;i++) {
-                if(!this->_run_flag)return false;
+                if(!this->_run_flag)break;
                 auto temp_control = this->_dynamic_system->randomControl();
                 auto steps = randomInteger(PlannerConfig::min_time_steps,PlannerConfig::max_time_steps);
                 if (this->_dynamic_system->forwardPropagateBySteps(parent->getState(),temp_control,
@@ -159,6 +160,7 @@ namespace acsr{
                     params_vec.push_back(std::move(v.second));
                 }
             }
+            if(!this->_run_flag)return false;
             return true;
         }
 

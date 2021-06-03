@@ -76,6 +76,9 @@ namespace acsr {
             nanowire_system->reset();
             database_observer = std::make_shared<DatabaseObserver<2*NANOWIRE_COUNT,16>>(nanowire_system);
             std::vector<PlannerType> planner_types = {PlannerType::e_iSST, PlannerType::e_Ref_iSST, PlannerType::e_SST};
+
+            std::thread forward_thread, reverse_thread, connecting_thread;
+
             for (auto j = 0; j < 6; ++j) {
                 PlannerConfig::planner = planner_types[j];
                 PlannerConfig::bidirection = !(j%2);
@@ -103,7 +106,7 @@ namespace acsr {
                     planner->setup();
                     //std::cout<<"Goal Radius: "<<Config::goal_radius<<std::endl;
 
-                    std::thread forward_thread, reverse_thread, connecting_thread;
+
 
                     ///forward step threadcc
                     forward_run_flag = true;
@@ -149,9 +152,10 @@ namespace acsr {
                             break;
                         }
                     }
-
-
-
+                    stop();
+                    while(!forward_stopped_flag);
+                    while(!reverse_stopped_flag);
+                    while(!optimize_stopped_flag);
                 }
             }
         }
