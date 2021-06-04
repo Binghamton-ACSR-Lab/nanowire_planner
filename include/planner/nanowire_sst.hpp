@@ -411,13 +411,13 @@ namespace acsr{
          * destructor
          */
         ~SST() override{
-            //forward_rtree.clear();
-            //forward_rtree.clear();
-            //optimize_set.clear();
-            //forward_prox_map.clear();
-            //backward_prox_map.clear();
-            //_root = nullptr;
-            //_goal = nullptr;
+            forward_rtree.clear();
+            forward_rtree.clear();
+            optimize_set.clear();
+            forward_prox_map.clear();
+            backward_prox_map.clear();
+            _root = nullptr;
+            _goal = nullptr;
         }
 
         /***
@@ -510,6 +510,7 @@ namespace acsr{
             auto it = this->optimize_set.begin();
             while(it!=this->optimize_set.end()){
                 if(!this->_run_flag)return;
+                std::scoped_lock<std::mutex> lock(optimize_set_mutex);
                 if(it->second.first.expired() || it->second.second.expired()){
                     it = optimize_set.erase(it);
                     continue;

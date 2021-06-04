@@ -50,6 +50,7 @@ namespace acsr {
             http_observer = std::make_shared<HttpServer<2*NANOWIRE_COUNT,16>>(SystemConfig::http_port);
             std::cout<<"start http server at port "<<SystemConfig::http_port<<std::endl;
             svg_observer = std::make_shared<SvgObserver<2*NANOWIRE_COUNT,16>>();
+            svg_observer->setNanowireConfig(NANOWIRE_COUNT);
             http_observer->run(callback);
 
 
@@ -92,7 +93,7 @@ namespace acsr {
                             Eigen::Map<Eigen::Matrix<double, 2 * NANOWIRE_COUNT, 1>>(target_states.data()));
                     planner->setGoalRadius(PlannerConfig::goal_radius);
 
-                    svg_observer->setNanowireConfig(NANOWIRE_COUNT);
+
                     planner->registerSolutionUpdateObserver(svg_observer);
                     planner->registerPlannerStartObserver(svg_observer);
                     planner->registerSolutionUpdateObserver(http_observer);
@@ -111,19 +112,19 @@ namespace acsr {
                     ///forward step threadcc
                     forward_run_flag = true;
                     forward_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::forwardExplore, this);
-                    forward_thread.detach();
+                    //forward_thread.detach();
                     if (PlannerConfig::bidirection) {
                         reverse_run_flag = true;
                         planner->setBiTreePlanner(true);
                         reverse_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::reverseExplore, this);
-                        reverse_thread.detach();
+                        //reverse_thread.detach();
                     }
 
                     if (PlannerConfig::optimization) {
                         optimize_run_flag = true;
                         planner->setOptimizedConnect(true);
                         connecting_thread = std::thread(&RunPlanner<NANOWIRE_COUNT>::connecting, this);
-                        connecting_thread.detach();
+                        //connecting_thread.detach();
                     }
                     VariablesGrid vg;
                     vg.read("reference_path.txt");
@@ -153,9 +154,17 @@ namespace acsr {
                         }
                     }
                     stop();
+                    if(forward_thread.joinable())
+                        forward_thread.join();
+                    if(reverse_thread.joinable())
+                        reverse_thread.join();
+                    if(connecting_thread.joinable())
+                        connecting_thread.join();
+                    std::this_thread::sleep_for(std::chrono::seconds(10));
                     while(!forward_stopped_flag);
                     while(!reverse_stopped_flag);
                     while(!optimize_stopped_flag);
+
                 }
             }
         }

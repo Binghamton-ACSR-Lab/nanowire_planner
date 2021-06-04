@@ -11,12 +11,13 @@ BOOST_GEOMETRY_REGISTER_NODE_CS(cs::cartesian)
 int main() {
 
     //dynamicTest();
+
     Logger::instance().setLogLevel(LVL_INFO);
+
     RunPlanner<3> run_planner;
     run_planner.init();
     std::vector<double> init_state = {500e-6,500e-6,1300e-6,1700e-6,1300e-6,100e-6};
     std::vector<double> target_state = {1100e-6,1200e-6,1300e-6,500e-6,700e-6,500e-6};
-   // run_planner.run();
     run_planner.performanceTest(30,init_state,target_state);
 
     //run_planner.run();
