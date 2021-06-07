@@ -14,6 +14,7 @@
 namespace acsr {
 
     USING_NAMESPACE_ACADO
+    template <int NANOWIRE_COUNT>
     class GlobalPath {
     public:
         GlobalPath() = default;
@@ -26,7 +27,7 @@ namespace acsr {
          * @param target_state target state
          * @return
          */
-        bool init(int wire_count,const Eigen::VectorXd &init_state, const Eigen::VectorXd &target_state) {
+        bool init(const Eigen::Matrix<double,2*NANOWIRE_COUNT,1> &init_state, const Eigen::Matrix<double,2*NANOWIRE_COUNT,1> &target_state) {
             ///read reference speed file
             if(NanowireConfig::type=="cc600") {
                 if (!boost::filesystem::exists("data/reference_speed_cc600.txt")) {
@@ -46,7 +47,7 @@ namespace acsr {
                 }
             }
 
-            _n_wires = wire_count;
+            //_n_wires = wire_count;
             _init_state = init_state;
             _target_state = target_state;
 
@@ -68,7 +69,7 @@ namespace acsr {
             std::vector<ElectordePositionType> start_vectors;
             std::vector<ElectordePositionType> target_vectors;
             std::vector<Eigen::Vector2d> init_state_vectors,target_state_vectors;
-            for(auto i=0;i<_n_wires;++i){
+            for(auto i=0;i<NANOWIRE_COUNT;++i){
                 init_state_vectors.emplace_back(_init_state(2*i),_init_state(2*i+1));
                 target_state_vectors.emplace_back(_target_state(2*i),_target_state(2*i+1));
             }
@@ -79,7 +80,7 @@ namespace acsr {
                 start_vectors.push_back(ElectordePositionType{pt});
             });
             ///generate init electrodes state
-            for(uint i=1;i<_n_wires;++i){
+            for(uint i=1;i<NANOWIRE_COUNT;++i){
                 auto temp = NanowireConfig::getNearElectrodes(init_state_vectors[i],1);
                 start_vectors = combineVectors(start_vectors,temp);
             }
@@ -90,7 +91,7 @@ namespace acsr {
                 target_vectors.push_back(ElectordePositionType{pt});
             });
             ///generate target electrodes state
-            for(uint i=1;i<_n_wires;++i){
+            for(uint i=1;i<NANOWIRE_COUNT;++i){
                 auto temp = NanowireConfig::getNearElectrodes(target_state_vectors[i],1);
                 target_vectors = combineVectors(target_vectors,temp);
             }
@@ -104,7 +105,7 @@ namespace acsr {
 
             ///sort by path length
             std::sort(p.begin(),p.end(),[&](const std::pair<ElectordePositionType,ElectordePositionType>& elem1,const std::pair<ElectordePositionType,ElectordePositionType>& elem2){
-                return getHeuristic(_n_wires,elem1.first,elem2.second)<getHeuristic(_n_wires,elem2.first,elem2.second);
+                return getHeuristic(NANOWIRE_COUNT,elem1.first,elem2.second)<getHeuristic(NANOWIRE_COUNT,elem2.first,elem2.second);
             });
 
             ///slim to maximum 5
@@ -152,18 +153,18 @@ namespace acsr {
                 global_route.init();
                 global::NanowirePositionType init_state;
                 global::NanowirePositionType target_state;
-                for (auto i = 0; i < _n_wires; ++i) {
+                for (auto i = 0; i < NANOWIRE_COUNT; ++i) {
                     init_state.push_back(std::make_pair(k.first[i](0),k.first[i](1)));
                     target_state.push_back(std::make_pair(k.second[i](0),k.second[i](1)));
                 }
-                auto init_index = global::electrodeVectorToIndex(_n_wires, init_state);
-                auto target_index = global::electrodeVectorToIndex(_n_wires, target_state);
+                auto init_index = global::electrodeVectorToIndex(NANOWIRE_COUNT, init_state);
+                auto target_index = global::electrodeVectorToIndex(NANOWIRE_COUNT, target_state);
                 std::vector<global::IndexType> path;
-                if (global_route.constructTree(_n_wires, init_index, target_index, divided_vecs[_n_wires - 1])) {
+                if (global_route.constructTree(NANOWIRE_COUNT, init_index, target_index, divided_vecs[NANOWIRE_COUNT - 1])) {
                     path = global_route.getBestSolution();
                     std::vector<ElectordePositionType> electrode_path;
                     std::transform(path.rbegin(),path.rend(),std::back_inserter(electrode_path),[&](global::IndexType index){
-                        auto v = global::indexToElectrodeVector(_n_wires,index);
+                        auto v = global::indexToElectrodeVector(NANOWIRE_COUNT,index);
                         ElectordePositionType ep;
                         for(auto&e:v){
                             ep.push_back(Eigen::Vector2i(e.first,e.second));
@@ -255,8 +256,8 @@ namespace acsr {
 
     private:
         VariablesGrid ref_time;
-        int _n_wires;
-        Eigen::VectorXd _init_state, _target_state;
+        //int _n_wires;
+        Eigen::Matrix<double,2*NANOWIRE_COUNT,1> _init_state, _target_state;
         std::vector<std::pair<ElectordePositionType,ElectordePositionType>> global_start_target;
 
     private:
@@ -361,7 +362,7 @@ namespace acsr {
             double d_start = 0.0;
             uint index = 0;
 
-            for(auto i=0;i<_n_wires;++i){
+            for(auto i=0;i<NANOWIRE_COUNT;++i){
                 VariablesGrid single_state;
                 auto d = generateSingleInitSegmentTrajectory(Eigen::Vector2d(_init_state(2*i),_init_state(2*i+1)),electrode[i],single_state);
                 if(d>d_start){

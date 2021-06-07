@@ -234,8 +234,8 @@ namespace acsr{
         void setup() override {
             SST<STATE_DIMENSION,CONTROL_DIMENSION>::setup();
             ///generating global reference path & storing it to "reference_path.txt"
-            GlobalPath global_path;
-            global_path.init(STATE_DIMENSION/2,this->_init_state,this->_target_state);
+            GlobalPath<STATE_DIMENSION/2> global_path;
+            global_path.init(this->_init_state,this->_target_state);
             global_path.getStartTargetElectordes();
             VariablesGrid states;
             global_path.generateBestReferenceTrajectory(states);

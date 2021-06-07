@@ -76,29 +76,28 @@ namespace acsr {
             nanowire_system->init(zeta_vec, height_vec);
             nanowire_system->reset();
             database_observer = std::make_shared<DatabaseObserver<2*NANOWIRE_COUNT,16>>(nanowire_system);
-            std::vector<PlannerType> planner_types = {PlannerType::e_iSST, PlannerType::e_Ref_iSST, PlannerType::e_SST};
+            std::vector<PlannerType> planner_types = {PlannerType::e_Ref_iSST, PlannerType::e_iSST,PlannerType::e_SST};
 
 
-
-            for (auto j = 0; j < 6; ++j) {
+            PlannerConfig::bidirection = true;
+            for (auto j = 0; j < 2; ++j) {
                 PlannerConfig::planner = planner_types[j];
-                PlannerConfig::bidirection = !(j%2);
                 for (auto i = 0; i < running_number; ++i) {
                     http_observer->reset();
                     ///create a new planner
                     planner = PlannerBuilder::create<2 * NANOWIRE_COUNT, 16>(PlannerConfig::planner, nanowire_system);
                     planner->setStartState(
-                            Eigen::Map<Eigen::Matrix<double, 2 * NANOWIRE_COUNT, 1>>(init_states.data()));
+                            Eigen::Map<Eigen::Matrix<double, 2 * NANOWIRE_COUNT, 1>>(init_states.data(),2 * NANOWIRE_COUNT));
                     planner->setTargetState(
-                            Eigen::Map<Eigen::Matrix<double, 2 * NANOWIRE_COUNT, 1>>(target_states.data()));
+                            Eigen::Map<Eigen::Matrix<double, 2 * NANOWIRE_COUNT, 1>>(target_states.data(),2 * NANOWIRE_COUNT));
                     planner->setGoalRadius(PlannerConfig::goal_radius);
 
 
-                    planner->registerSolutionUpdateObserver(svg_observer);
-                    planner->registerPlannerStartObserver(svg_observer);
+                    //planner->registerSolutionUpdateObserver(svg_observer);
+                    //planner->registerPlannerStartObserver(svg_observer);
                     planner->registerSolutionUpdateObserver(http_observer);
-                    planner->registerPlannerStartObserver(http_observer);
-                    planner->registerNodeAddedObserver(svg_observer);
+                    //planner->registerPlannerStartObserver(http_observer);
+                    //planner->registerNodeAddedObserver(svg_observer);
                     planner->registerSolutionUpdateObserver(tcp_server);
 
                     planner->registerSolutionUpdateObserver(database_observer);
@@ -141,9 +140,10 @@ namespace acsr {
 
                         std::cout<<"planner is running\n Number of Node: ";
                         auto nodes_count = planner->getNumberOfNode();
-
+                        std::cout<<"iterators:"<<i<<std::endl;
                         std::cout<<nodes_count.first << "\t"<<nodes_count.second<<"\n";
                         //std::cout<<planner->tree_add_cost<<'\t'<<planner->tree_remove_cost<<'\t'<<planner->tree_search_cost<<'\n';
+
                         if(planner->getBestCost()>1e6){
                             std::cout<<"no solution\n";
                         }else {
