@@ -70,6 +70,8 @@ namespace acsr {
         static int field_data_rows;///the field data parameter
         static int field_data_cols;///the field data parameter
         static int field_data_layers;///the field data parameter
+        static double electrode_radius;// = 50
+        static bool allow_to_enter_electrode;// = 0
 
     public:
         /***
@@ -98,7 +100,12 @@ namespace acsr {
                 if(field_dimension==2)
                     return "E_Map_4by4Mask1_100V_CC600reE.txt";
                 else if(field_dimension==3)
-                    return "E_Map_4by4_100V_CC600_E_3D_1mm.txt";
+                    return "E_Map_4by4_100V_CC600_E_3D_900um.txt";
+            }else if (type == "cc400") {
+                if(field_dimension==2)
+                    return "";
+                else if(field_dimension==3)
+                    return "E_Map_4by4_100V_CC400_E_3D_960um.txt";
             }
             return std::string();
         }
@@ -145,6 +152,12 @@ namespace acsr {
             return std::vector<Eigen::Vector2i>(v.begin(),v.begin()+count);
         }
 
+        static bool isInElectrodeRegion(const Eigen::Vector2d &pt){
+            auto elec_v = getNearElectrodes(pt,1);
+            auto p = electrodePositionToPosition(elec_v.front());
+            return (p-pt).norm()<electrode_radius;
+        }
+
         /***
         * read config file, this function should be called after create an instance
         */
@@ -158,7 +171,9 @@ namespace acsr {
                     ("electrodes_column", po::value<int>(&NanowireConfig::electrodes_columns)->default_value(4), "electrodes column")
                     ("field_data_rows", po::value<int>(&NanowireConfig::field_data_rows)->default_value(181), "")
                     ("field_data_cols", po::value<int>(&NanowireConfig::field_data_cols)->default_value(181), "")
-                    ("field_data_layers", po::value<int>(&NanowireConfig::field_data_layers)->default_value(181), "");
+                    ("field_data_layers", po::value<int>(&NanowireConfig::field_data_layers)->default_value(181), "")
+                    ("electrode_radius", po::value<double>(&NanowireConfig::electrode_radius)->default_value(50), "")
+                    ("allow_to_enter_electrode", po::value<bool>(&NanowireConfig::allow_to_enter_electrode)->default_value(true), "");
 
             po::variables_map varmap;
 
@@ -174,8 +189,11 @@ namespace acsr {
                 electrodes_space = 600e-6;
             }else if(type == "cc60"){
                 electrodes_space = 60e-6;
+            }else if(type == "cc400"){
+                electrodes_space = 400e-6;
             }
             field_height*=1e-6;
+            electrode_radius*=1e-6;
         }
     };
 
@@ -187,7 +205,8 @@ namespace acsr {
     int NanowireConfig::field_data_rows;///the field data parameter
     int NanowireConfig::field_data_cols;///the field data parameter
     int NanowireConfig::field_data_layers;///the field data parameter
-
+    double NanowireConfig::electrode_radius;// = 50
+    bool NanowireConfig::allow_to_enter_electrode;
 
     class EpField {
     private:
