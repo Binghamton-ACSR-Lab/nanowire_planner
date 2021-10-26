@@ -35,12 +35,21 @@ namespace acsr {
                     return false;
                 }
                 ref_time.read("data/reference_speed_cc600.txt");
+            }else if(NanowireConfig::type=="cc400") {
+                if (!boost::filesystem::exists("data/reference_speed_cc400_h700.txt")) {
+                    std::cout << "Reference data for cc400 is missing";
+                    return false;
+                }
+                ref_time.read("data/reference_speed_cc400_h200.txt");
+                for (auto i = 0; i < ref_time.getNumPoints(); ++i) {
+                    ref_time.setVector(i,ref_time.getVector(i)*1e-6);
+                }
             }else if(NanowireConfig::type=="cc60"){
-                if (!boost::filesystem::exists("data/reference_speed_cc60.txt")) {
+                if (!boost::filesystem::exists("data/reference_speed_cc400_h700.txt")) {
                     std::cout << "Reference data for cc60 is missing";
                     return false;
                 }
-                ref_time.read("data/reference_speed_cc60.txt");
+                ref_time.read("data/reference_speed_cc400_h700.txt");
                 for (auto i = 0; i < ref_time.getNumPoints(); ++i) {
                     ref_time.setVector(i,ref_time.getVector(i)*1e-6);
                     ref_time.setTime(i,ref_time.getTime(i)*1.5);

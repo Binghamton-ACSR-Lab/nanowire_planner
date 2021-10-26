@@ -97,7 +97,7 @@ namespace acsr {
                     //planner->registerPlannerStartObserver(svg_observer);
                     planner->registerSolutionUpdateObserver(http_observer);
                     //planner->registerPlannerStartObserver(http_observer);
-                    //planner->registerNodeAddedObserver(svg_observer);
+                    planner->registerNodeAddedObserver(svg_observer);
                     planner->registerSolutionUpdateObserver(tcp_server);
 
                     planner->registerSolutionUpdateObserver(database_observer);
@@ -608,7 +608,6 @@ namespace acsr {
             vg.read("reference_path.txt");
             planner->notifyPlannerStart(getPlannerString(PlannerConfig::planner,PlannerConfig::bidirection),"img",vg);
         }
-
 
     private:
         std::shared_ptr<Planner<2*NANOWIRE_COUNT,16>> planner; //planner

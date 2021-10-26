@@ -244,6 +244,8 @@ namespace acsr {
             result_state = init_state;
             for (auto i = 0; i < steps; ++i) {
                 _field->getField<NANOWIRE_COUNT>(result_state,_current_height, mat_E);
+                //std::cout<<mat_E<<std::endl;
+
                 auto mat_velocity = temp_mat_theta * mat_E * control;
                 if(mat_velocity.norm()/NANOWIRE_COUNT>MAX_VELOCITY){
                     MAX_VELOCITY = mat_velocity.norm()/NANOWIRE_COUNT;
@@ -399,7 +401,7 @@ namespace acsr {
             ACADO::Parameter T;
 
             ///horizontal steps
-            double steps = 15;
+            int steps = 15;
             x.clearStaticCounters();
             u.clearStaticCounters();
             T.clearStaticCounters();
@@ -417,7 +419,7 @@ namespace acsr {
                 _field->getField<NANOWIRE_COUNT>(state, _current_height, mat_E);
                 ACADO::DMatrix B = _mat_theta * mat_E * _em / _mu;
 
-                ///set differerntial equation
+                ///set differential equation
                 ACADO::DifferentialEquation f(0.0, T);
                 f << dot(x) == B * u;
 
@@ -540,12 +542,14 @@ namespace acsr {
                                                  });
             if(NanowireConfig::type=="cc60")
                 _step_length = std::max((0.1 / std::abs(*max_theta_pt)), 0.1) * PlannerConfig::integration_step;
-            else if(NanowireConfig::type=="cc600")
+            else if(NanowireConfig::type=="cc600" || NanowireConfig::type=="cc400")
                 _step_length = std::max(int(1.0 / std::abs(*max_theta_pt)), 1) * PlannerConfig::integration_step;
-            if(_field_dimension==3) {
+
+            if(_field_dimension==3 && NanowireConfig::type=="cc60") {
                 auto x = _current_height.maxCoeff();
                 _step_length *= 10 * 2e-7 / (-7e-7 * std::log(x/1.02) - 5e-6);
             }
+
             _step_length = std::round(_step_length*10)/10.0;
         }
 
@@ -557,8 +561,6 @@ namespace acsr {
         void setHeight(const Eigen::Matrix<double,NANOWIRE_COUNT,1>& height){
             _current_height = height;
         }
-
-
 
     };
 }

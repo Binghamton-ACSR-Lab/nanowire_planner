@@ -346,6 +346,7 @@ namespace acsr{
          * @param node
          */
         virtual void branchBound(TreeNodePtr node){
+            std::lock_guard<std::recursive_mutex> lk(branch_mutex);
             auto children = node->getChildren();
             auto temp_target = node->getTreeId()==TreeId::forward?_target_state:_init_state;
             if(node->getCost() + this->_dynamic_system->getHeuristic(node->getState(),temp_target)  > _best_cost){
@@ -394,7 +395,7 @@ namespace acsr{
         std::unordered_map<Eigen::Matrix<int,STATE_DIMENSION,1>,std::weak_ptr<SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>,GridHash<STATE_DIMENSION>> forward_prox_map; ///map storing forward active node but in weak_ptr
         std::unordered_map<Eigen::Matrix<int,STATE_DIMENSION,1>,std::weak_ptr<SSTTreeNode<double,STATE_DIMENSION,CONTROL_DIMENSION>>,GridHash<STATE_DIMENSION>> backward_prox_map; ///map storing backword active node but in weak_ptr
 
-
+        std::recursive_mutex branch_mutex;
     public:
         SST() = delete;
 

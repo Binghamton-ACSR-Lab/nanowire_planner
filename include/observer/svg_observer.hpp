@@ -52,8 +52,8 @@ namespace acsr {
          */
         void setNanowireConfig(int wire_count){
             _n_wire = wire_count;
-            width = 600*(NanowireConfig::electrodes_columns-1) *zoom;
-            height = 600*(NanowireConfig::electrodes_rows-1) *zoom;
+            width = 400*(NanowireConfig::electrodes_columns-1) *zoom;
+            height = 400*(NanowireConfig::electrodes_rows-1) *zoom;
         }
 
 
@@ -267,9 +267,9 @@ namespace acsr {
          */
         inline Point convertStateToImagePoint(const StateType &state, int robot_index) {
             return Point(
-                    zoom * (state(robot_index * 2)*600/NanowireConfig::electrodes_space ) +
+                    zoom * (state(robot_index * 2)*400/NanowireConfig::electrodes_space ) +
                     0.05 * width,
-                    zoom * (state(robot_index * 2 + 1)*600/NanowireConfig::electrodes_space ) +
+                    zoom * (state(robot_index * 2 + 1)*400/NanowireConfig::electrodes_space ) +
                     0.05 * height
             );
         }

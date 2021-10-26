@@ -211,9 +211,7 @@ namespace acsr{
         iSST()=delete;
         iSST(const iSST&) = delete;
 
-        ~iSST() override{
-
-        }
+        ~iSST() override= default;
 
         /***
          * override forward step

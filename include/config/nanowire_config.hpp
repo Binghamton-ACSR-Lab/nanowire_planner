@@ -256,7 +256,7 @@ namespace acsr {
          * @return value from interpolation
          */
         float interp3d(int page, float x, float y,float z) {
-            int l = std::ceil((NanowireConfig::field_data_rows - 1) / NanowireConfig::field_height * z);
+            int l = std::ceil((NanowireConfig::field_data_layers - 1) / NanowireConfig::field_height * z);
             if (l == 0) {
                 return interp2dWithHeight(page,x,y,0);
             }
@@ -285,7 +285,7 @@ namespace acsr {
             if (col == 0) {
                 return linearInterpolation(value3d[page][row - 1][0][height], value3d[page][row - 1][0][height], y_axis[row - 1], x_axis[row], y);
             }
-
+            //std::cout<<value3d[page][row - 1][col - 1][height]<<std::endl;
             return bilinearInterpolation(value3d[page][row - 1][col - 1][height], value3d[page][row][col - 1][height], value3d[page][row - 1][col][height], value3d[page][row][col][height],
                                          x_axis[col - 1], x_axis[col], y_axis[row - 1], y_axis[row], x, y);
         }
@@ -328,7 +328,7 @@ namespace acsr {
                     value3d[p] = new float**[data_rows];
                     for (int i = 0; i < data_rows; ++i) {
                         value3d[p][i] = new float *[data_columns];
-                        for (int j = 0; j < data_layers; ++j) {
+                        for (int j = 0; j < data_columns; ++j) {
                             value3d[p][i][j] = new float [data_layers];
                         }
                     }
