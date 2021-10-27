@@ -9,6 +9,8 @@
 #include "nanowire_utility.hpp"
 #include <boost/filesystem.hpp>
 #include <assert.h>
+#include <casadi/casadi.hpp>
+
 namespace acsr {
     namespace po = boost::program_options;
 
@@ -491,6 +493,31 @@ namespace acsr {
             }
             ///mapping 2d-array to matrix
             mat_E = Eigen::Matrix<double,-1,-1,Eigen::RowMajor>::Map(&ex[0][0],2*WIRE_COUNT,pages);
+        }
+
+        template<int WIRE_COUNT>
+        void getField(const Eigen::Matrix<double,2*WIRE_COUNT,1> &state, const Eigen::Matrix<double,WIRE_COUNT,1> &height, casadi::DM &mat_E) {
+            auto pages = NanowireConfig::electrodes_rows * NanowireConfig::electrodes_columns;
+            std::vector<std::vector<double>> ex;
+            for(auto i=0;i<2*WIRE_COUNT;++i)
+                ex.push_back(std::vector<double>(pages));            
+            if(_dimension==2) {
+                for (int k = 0; k < WIRE_COUNT; ++k) {
+                    for (int i = 0; i < pages; ++i) {
+                        ex[2 * k][i] = double(interp2d(i, float(state(2*k)), float(state(2*k+1))));
+                        ex[2 * k + 1][i] = double(interp2d(i + pages, float(state(2*k)), float(state(2*k+1))));
+                    }
+                }
+            }else if(_dimension==3){
+                for(int k=0;k<WIRE_COUNT;++k){
+                    for(int i=0;i<pages;++i){
+                        ex[2*k][i]=double(interp3d(i,float(state(2*k)),float(state(2*k+1)),float(height(k))));
+                        ex[2*k+1][i]=double(interp3d(i+pages,float(state(2*k)),float(state(2*k+1)),float(height(k))));
+                    }
+                }
+            }
+            ///mapping 2d-array to matrix
+            mat_E = casadi::DM(ex);
         }
     };
 }

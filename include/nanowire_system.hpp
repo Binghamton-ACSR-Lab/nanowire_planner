@@ -14,6 +14,8 @@
 #include "tree_node.hpp"
 #include "nanowire_utility.hpp"
 #include "svg.hpp"
+#include <casadi/casadi.hpp>
+
 namespace acsr {
 
     USING_NAMESPACE_ACADO
@@ -82,6 +84,12 @@ namespace acsr {
         ControlType _control_low_bound;
         ControlType _control_upper_bound;
 
+        casadi::DM _state_low_bound_casadi;
+        casadi::DM _state_upper_bound_casadi;
+        casadi::DM _control_low_bound_casadi;
+        casadi::DM _control_upper_bound_casadi;
+        casadi::DM _mat_theta_casadi;
+
         Eigen::Matrix<double,NANOWIRE_COUNT,1> _current_height;
         Eigen::Matrix<double,2*NANOWIRE_COUNT,2*NANOWIRE_COUNT> _mat_theta;
 
@@ -124,6 +132,17 @@ namespace acsr {
             _control_low_bound.setZero();
             _control_upper_bound.resize(ELECTRODE_COUNT);
             _control_upper_bound.setOnes();
+
+            _state_upper_bound_casadi.resize(2*NANOWIRE_COUNT,1);
+            _state_low_bound_casadi = casadi::DM::ones(2 * NANOWIRE_COUNT,1)*10e-6;
+            for (auto i = 0; i < NANOWIRE_COUNT; ++i) {
+                _state_upper_bound_casadi(2 * i) =
+                        NanowireConfig::electrodes_space * (NanowireConfig::electrodes_columns - 1)-10e-6;
+                _state_upper_bound_casadi(2 * i + 1) =
+                        NanowireConfig::electrodes_space * (NanowireConfig::electrodes_rows - 1)-10e-6;                
+            }
+            _control_low_bound_casadi=casadi::DM::zeros(ELECTRODE_COUNT,1);
+            _control_upper_bound_casadi=casadi::DM::ones(ELECTRODE_COUNT,1);
         }
 
         virtual ~NanowireSystem() = default;
@@ -137,6 +156,7 @@ namespace acsr {
             setZetaPotential(zeta);
             setHeight(height);
             updateStepLength();
+            
         }
 
         /***
@@ -367,9 +387,14 @@ namespace acsr {
             auto controls = std::make_shared<ACADO::VariablesGrid>();//=new VariablesGrid();
 
             states->addVector(x0, 0);
-            if (!optimize(x0, xt, states, controls)) {
+            int iterate = 0;
+            if (!optimize_casadi(x0, xt, states, controls,iterate)) {
                 return false;
             }
+            /*
+            if (!optimize(x0, xt, states, controls)) {
+                return false;
+            }*/
 
             //std::cout<<states->getNumPoints()<<'\t'<<controls->getNumPoints()<<'\n';
 
@@ -511,6 +536,120 @@ namespace acsr {
             return true;
         }
 
+
+        bool optimize_casadi( Eigen::Matrix<double,2*NANOWIRE_COUNT,1> x0, Eigen::Matrix<double,2*NANOWIRE_COUNT,1> xt,
+                      std::shared_ptr<ACADO::VariablesGrid> states,
+                      std::shared_ptr<ACADO::VariablesGrid> controls,
+                      int& iterate) {
+            
+            //auto nanowire_count = _nanowire_config->getNanowireCount();
+            auto dynamic_function = [](const casadi::DM& B, const casadi::MX& u)->casadi::MX{
+                return casadi::MX::mtimes(B,u);
+            };
+
+            auto dm_to_dvector=[](const casadi::DM& dm,int size)->ACADO::DVector{
+                auto v = static_cast<std::vector<double>>(dm);
+                return ACADO::DVector(size,v.data());
+            };
+
+            auto dvector_to_dm=[](const ACADO::DVector& dvector,int size)->casadi::DM{
+                std::vector<double> v(dvector.data(),dvector.data()+size);
+                return casadi::DM(v);
+            };
+
+            ///horizontal steps
+            double steps = 40;
+            
+            if (iterate++ >= 8)
+                return false;
+
+            auto state = (x0+xt)/2;
+            casadi::DM mat_E;
+            _field->getField(state, _current_height, mat_E);                
+            auto B = casadi::DM::mtimes(_mat_theta_casadi,mat_E) * _em / _mu;
+
+            auto opti=casadi::Opti();
+            auto x = opti.variable(2*NANOWIRE_COUNT,steps+1);
+            auto u = opti.variable(ELECTRODE_COUNT,steps);
+            auto T = opti.variable();
+            casadi::Slice all;
+
+            opti.minimize(T);
+
+            auto dm_x0 = dvector_to_dm(x0,2*NANOWIRE_COUNT);
+            auto dm_xt = dvector_to_dm(xt,2*NANOWIRE_COUNT);
+
+            auto dt = T/steps;
+            for(int k=0;k<steps;++k){
+                auto dxdt = dynamic_function(B,u(all,k));
+                auto x_next = x(all,k) + dxdt*dt;
+                opti.subject_to(x(all,k+1)==x_next);
+            }
+
+            opti.subject_to(_control_low_bound_casadi<=u<=_control_upper_bound_casadi);
+            opti.subject_to(_state_low_bound_casadi <= x<= _state_upper_bound_casadi);
+
+            opti.subject_to(x(all,0)==dm_x0);
+            opti.subject_to(x(all,steps)==dm_xt);
+            opti.subject_to(0<T<200);
+
+            casadi::Dict opts;
+            opts["print_level"] = 0;
+            opti.solver("ipopt",casadi::Dict(),opts);
+
+            casadi::DM optimized_states,optimized_controls;
+            double optimal_value;
+
+            try{
+                auto sol = opti.solve();   // actual solve
+                optimized_states = sol.value(x);
+                optimized_controls = sol.value(u);
+                optimal_value = double(sol.value(T));
+            }catch(casadi::CasadiException& e){
+                std::cout<<"Solve OCP Fails\n "<<std::endl;
+                return false;
+            }
+
+          ///explore with nonlinear mat_E using the control from the optimize process
+            auto current_state = x0;
+            auto time_interval=optimal_value/steps;
+            
+
+            double current_time=0;
+            if(!states->isEmpty()){
+                current_time = states->getLastTime();
+            }
+
+            bool re_connect = false;
+
+            for (auto index = 0; index < steps; ++index) {
+                auto current_control = optimized_controls(all,index);
+                auto current_optimized_state = optimized_states(all,index+1);
+                _field->getField(current_state, _current_height, mat_E);
+
+                auto B = casadi::DM::mtimes(_mat_theta_casadi, mat_E)  * _em / _mu;                    
+                auto velocity = casadi::DM::mtimes(B, current_control);
+                auto casadi_state = dvector_to_dm(current_state,2*NANOWIRE_COUNT) + velocity * _step_length;
+                current_time += time_interval;
+
+                if (!validState(current_state))
+                    return false;
+                
+                if(double(casadi::DM::norm_2(casadi_state-current_optimized_state))<PlannerConfig::goal_radius){
+                    states->addVector(dm_to_dvector(casadi_state,2*NANOWIRE_COUNT),current_time);
+                    controls->addVector(dm_to_dvector(current_control,ELECTRODE_COUNT),current_time);
+                }else{
+                    re_connect = true;
+                    break;
+                }
+            }
+            if(re_connect){
+                return optimize_casadi(states->getLastVector(),xt,states,controls,iterate);
+            }
+            return true;
+            
+        }
+
     protected:
 
 
@@ -556,6 +695,8 @@ namespace acsr {
         void setZetaPotential(const StateType &zeta_potential) {
             //assert(zeta_potential.size() == 2*NANOWIRE_COUNT);
             _mat_theta = zeta_potential.asDiagonal();
+            std::vector<double> v(zeta_potential.data(),zeta_potential.data()+2*NANOWIRE_COUNT);
+            _mat_theta_casadi = casadi::DM::diag(v);
         }
 
         void setHeight(const Eigen::Matrix<double,NANOWIRE_COUNT,1>& height){

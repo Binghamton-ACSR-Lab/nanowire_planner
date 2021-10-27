@@ -93,10 +93,10 @@ namespace acsr {
                     planner->setGoalRadius(PlannerConfig::goal_radius);
 
 
-                    //planner->registerSolutionUpdateObserver(svg_observer);
-                    //planner->registerPlannerStartObserver(svg_observer);
+                    planner->registerSolutionUpdateObserver(svg_observer);
+                    planner->registerPlannerStartObserver(svg_observer);
                     planner->registerSolutionUpdateObserver(http_observer);
-                    //planner->registerPlannerStartObserver(http_observer);
+                    planner->registerPlannerStartObserver(http_observer);
                     planner->registerNodeAddedObserver(svg_observer);
                     planner->registerSolutionUpdateObserver(tcp_server);
 

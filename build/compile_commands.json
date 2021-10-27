@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/PODS/xli185/Documents/project/nanowire_planner/build",
+  "command": "/usr/bin/x86_64-linux-gnu-g++-10  -I/home/PODS/xli185/Documents/project/nanowire_planner/include -I/home/PODS/xli185/Documents/project/nanowire_planner/include/utility -I/home/PODS/xli185/Documents/project/nanowire_planner/include/planner -I/home/PODS/xli185/Documents/project/nanowire_planner/include/observer -I/home/PODS/xli185/Documents/project/nanowire_planner/include/global_route -I/usr/local/include/acado -g -std=gnu++17 -o CMakeFiles/NanowirePlanner.dir/main.cpp.o -c /home/PODS/xli185/Documents/project/nanowire_planner/main.cpp",
+  "file": "/home/PODS/xli185/Documents/project/nanowire_planner/main.cpp"
+}
+]
