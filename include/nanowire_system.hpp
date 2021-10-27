@@ -636,7 +636,8 @@ namespace acsr {
                     return false;
                 
                 if(double(casadi::DM::norm_2(casadi_state-current_optimized_state))<PlannerConfig::goal_radius){
-                    states->addVector(dm_to_dvector(casadi_state,2*NANOWIRE_COUNT),current_time);
+                    current_state = dm_to_dvector(casadi_state,2*NANOWIRE_COUNT);
+                    states->addVector(current_state,current_time);
                     controls->addVector(dm_to_dvector(current_control,ELECTRODE_COUNT),current_time);
                 }else{
                     re_connect = true;
