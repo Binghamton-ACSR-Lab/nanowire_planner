@@ -609,6 +609,7 @@ namespace acsr {
                 std::cout<<"Solve OCP Fails\n "<<std::endl;
                 return false;
             }
+            if(optimal_value<0 || optimal_value>200)return false;
 
           ///explore with nonlinear mat_E using the control from the optimize process
             auto current_state = x0;
