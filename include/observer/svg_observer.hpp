@@ -107,14 +107,18 @@ namespace acsr {
             shared_image_name = image_name;
 
             ///draw reference path
-            for(auto i=0;i<_n_wire;++i) {
-                Stroke stroke(width/100, colors[i]);
-                Polyline ref_path(stroke);
-                for(auto j=0;j<reference_path.getNumPoints();++j){
-                    ref_path << Point(convertStateToImagePoint(reference_path.getVector(j),i));
+            if(type.find("ref")!=std::string::npos){
+                for(auto i=0;i<_n_wire;++i) {
+                    Stroke stroke(width/100, colors[i]);
+                    Polyline ref_path(stroke);
+                    for(auto j=0;j<reference_path.getNumPoints();++j){
+                        ref_path << Point(convertStateToImagePoint(reference_path.getVector(j),i));
+                    }
+                    original_image << ref_path;
                 }
-                original_image << ref_path;
             }
+            
+
             solution_image = original_image;
             original_image.save(shared_image_name+".svg");
             original_image.save(shared_image_name+"_solution.svg");

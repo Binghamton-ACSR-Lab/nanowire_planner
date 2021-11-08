@@ -209,7 +209,7 @@ namespace acsr {
                                       const std::vector<double> &reverse_durations,
                                       const std::vector<double> &connect_durations,const std::string& solution_string) override {
 
-
+            /*                              
             auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::system_clock::now() - start_time).count();
             std::string trajectory_table_name = solution_table + "_time_" + std::to_string(stamp);
@@ -231,7 +231,7 @@ namespace acsr {
                 std::cout << "Insert Solution Error\n";
                 std::cout << e.what();
                 return;
-            }
+            }*/
         }
 
         void onNodeUpdate(unsigned node1, unsigned node2){

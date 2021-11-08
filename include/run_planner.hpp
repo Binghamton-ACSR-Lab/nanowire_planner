@@ -93,10 +93,10 @@ namespace acsr {
                     planner->setGoalRadius(PlannerConfig::goal_radius);
 
 
-                    planner->registerSolutionUpdateObserver(svg_observer);
-                    planner->registerPlannerStartObserver(svg_observer);
+                    //planner->registerSolutionUpdateObserver(svg_observer);
+                    //planner->registerPlannerStartObserver(svg_observer);
                     planner->registerSolutionUpdateObserver(http_observer);
-                    planner->registerPlannerStartObserver(http_observer);
+                    //planner->registerPlannerStartObserver(http_observer);
                     planner->registerNodeAddedObserver(svg_observer);
                     planner->registerSolutionUpdateObserver(tcp_server);
 
@@ -506,11 +506,16 @@ namespace acsr {
             nanowire_system->init(zeta_vec, height_vec);
             nanowire_system->reset();
 
+
             ///create a new planner
             planner = PlannerBuilder::create<2*NANOWIRE_COUNT,16>(PlannerConfig::planner,nanowire_system);
             planner->setStartState(Eigen::Map<Eigen::Matrix<double,2*NANOWIRE_COUNT,1>>(_init_states.data()));
             planner->setTargetState(Eigen::Map<Eigen::Matrix<double,2*NANOWIRE_COUNT,1>>(_target_states.data()));
             planner->setGoalRadius(PlannerConfig::goal_radius);
+
+            database_observer = std::make_shared<DatabaseObserver<2*NANOWIRE_COUNT,16>>(nanowire_system);
+            planner->registerSolutionUpdateObserver(database_observer);
+            planner->registerPlannerStartObserver(database_observer);
 
 
             svg_observer->setNanowireConfig(NANOWIRE_COUNT);
@@ -574,6 +579,10 @@ namespace acsr {
             planner->setGoalRadius(PlannerConfig::goal_radius);
 
             ///register observers
+            //database_observer = std::make_shared<DatabaseObserver<2*NANOWIRE_COUNT,16>>(nanowire_system);
+            planner->registerSolutionUpdateObserver(database_observer);
+            planner->registerPlannerStartObserver(database_observer);
+
             planner->registerSolutionUpdateObserver(svg_observer);
             planner->registerPlannerStartObserver(svg_observer);
             planner->registerSolutionUpdateObserver(http_observer);

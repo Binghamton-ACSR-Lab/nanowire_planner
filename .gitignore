@@ -1,0 +1,7 @@
+build/**
+build/data/**
+build/CMakeFiles/**
+build/image/**
+build/.cmake/**
+build/*.svg
+build/NanowirePlanner
