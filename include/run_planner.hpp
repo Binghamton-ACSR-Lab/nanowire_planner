@@ -180,7 +180,7 @@ namespace acsr {
         void run(){
             ///waiting until receiving exit command
             while(!exit_flag){
-                if(!run_flag) {
+                if(!run_flag) {                    
                     showMessage("waiting command");
                 }else{
                     std::cout<<"planner is running\n Number of Node: ";
