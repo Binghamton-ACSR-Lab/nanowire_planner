@@ -137,8 +137,11 @@ namespace acsr {
                                                              option.maxRecvBufferSize = 1024 * 1024;
                                                              service->addTcpConnection(std::move(socket), option);
                                                          });
-
-                listenThread->startListen();
+                try{
+                    listenThread->startListen();
+                }catch(std::exception& e){
+                    std::cout<<e.what()<<std::endl;
+                }
                 service->startWorkerThread(2);
                 while (run_flag) {
                     mainLoop->loop(1);

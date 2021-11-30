@@ -16,6 +16,8 @@
 #include "svg.hpp"
 #include <casadi/casadi.hpp>
 
+
+
 namespace acsr {
 
     USING_NAMESPACE_ACADO
@@ -96,7 +98,7 @@ namespace acsr {
         const double _e0 = 8.85e-12;
         const double _em = 2.17 * _e0;
         const double _mu = 216.95e-3;
-        const double _wire_radius = 5e-6;
+        const double _wire_radius = 100e-6;
 
         double _step_length{};
         int _field_dimension{};
@@ -386,16 +388,20 @@ namespace acsr {
             auto states = std::make_shared<ACADO::VariablesGrid>();//=new VariablesGrid();
             auto controls = std::make_shared<ACADO::VariablesGrid>();//=new VariablesGrid();
 
+
             states->addVector(x0, 0);
+
+#ifdef _USE_CASADI_
             int iterate = 0;
             if (!optimize_casadi(x0, xt, states, controls,iterate)) {
                 return false;
             }
-            /*
+#else
+            
             if (!optimize(x0, xt, states, controls)) {
                 return false;
-            }*/
-
+            }
+#endif
             //std::cout<<states->getNumPoints()<<'\t'<<controls->getNumPoints()<<'\n';
 
             vec_state.resize(controls->getNumPoints(), 2 * NANOWIRE_COUNT);
@@ -671,6 +677,10 @@ namespace acsr {
             for (int i = 0; i < NANOWIRE_COUNT; i++) {
                 if (state[2 * i] <= _state_low_bound(0) || state[2 * i] >= _state_upper_bound(0)
                     || state[2 * i + 1] <= _state_low_bound(1) || state[2 * i + 1] >= _state_upper_bound(1))
+                    return false;
+                //std::cout<<NanowireConfig::allow_to_enter_electrode<<std::endl;
+                //std::cout<<NanowireConfig::isInElectrodeRegion(state.segment(2 * i, 2))<<std::endl;
+                if((!NanowireConfig::allow_to_enter_electrode) && NanowireConfig::isInElectrodeRegion(state.segment(2 * i, 2)))
                     return false;
             }
             return true;

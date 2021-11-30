@@ -429,22 +429,26 @@ namespace acsr {
                 };
 
                 brynet::net::wrapper::HttpListenerBuilder listenBuilder;
-                listenBuilder.WithService(service)
-                        .AddSocketProcess({
-                                                        [](TcpSocket &socket) {
-                                                            socket.setNodelay();
-                                                        },
-                                                })
-                        .WithMaxRecvBufferSize(2048)
-                        .WithAddr(false, "0.0.0.0", port)
-                        .WithEnterCallback([httpEnterCallback, wsEnterCallback](
-                                const brynet::net::http::HttpSession::Ptr &httpSession,
-                                brynet::net::http::HttpSessionHandlers &handlers) {
-                            handlers.setHttpCallback(httpEnterCallback);
-                            handlers.setWSCallback(wsEnterCallback);
+                try{
+                    listenBuilder.WithService(service)
+                            .AddSocketProcess({
+                                                            [](TcpSocket &socket) {
+                                                                socket.setNodelay();
+                                                            },
+                                                    })
+                            .WithMaxRecvBufferSize(2048)
+                            .WithAddr(false, "0.0.0.0", port)
+                            .WithEnterCallback([httpEnterCallback, wsEnterCallback](
+                                    const brynet::net::http::HttpSession::Ptr &httpSession,
+                                    brynet::net::http::HttpSessionHandlers &handlers) {
+                                handlers.setHttpCallback(httpEnterCallback);
+                                handlers.setWSCallback(wsEnterCallback);
 
-                        })
-                        .asyncRun();
+                            })
+                            .asyncRun();
+                }catch(std::exception& e){
+                    std::cout<<e.what()<<std::endl;
+                }
 
                 while (run_flag) {
                     std::this_thread::sleep_for(std::chrono::seconds(1));

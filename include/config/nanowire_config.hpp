@@ -131,6 +131,15 @@ namespace acsr {
          */
         static std::vector<Eigen::Vector2i> getNearElectrodes(const Eigen::Vector2d &pt,int count) {
             //std::cout << column_space;
+            if(count==1){
+                int x = int(pt(0)/ electrodes_space);
+                int y = int(pt(1)/ electrodes_space);
+                return std::vector<Eigen::Vector2i>{Eigen::Vector2i(x,y)};
+
+            }
+
+
+
             int f0 = std::floor(pt(0) / electrodes_space);
             int c0 = std::ceil(pt(0) / electrodes_space);
             int f1 = std::floor(pt(1) / electrodes_space);
@@ -155,8 +164,15 @@ namespace acsr {
         }
 
         static bool isInElectrodeRegion(const Eigen::Vector2d &pt){
-            auto elec_v = getNearElectrodes(pt,1);
-            auto p = electrodePositionToPosition(elec_v.front());
+            //std::cout<<pt(0)/ electrodes_space<<std::endl;
+            //std::cout<<pt(1)/ electrodes_space<<std::endl;
+            auto x = std::round(pt(0)/ electrodes_space);
+            auto y = std::round(pt(1)/ electrodes_space);
+            //std::cout<<x<<std::endl;
+            //std::cout<<y<<std::endl;
+            auto p = Eigen::Vector2d(x*electrodes_space,y*electrodes_space);
+            //std::cout<<(p-pt).norm()<<std::endl;
+            //std::cout<<electrode_radius<<std::endl;
             return (p-pt).norm()<electrode_radius;
         }
 

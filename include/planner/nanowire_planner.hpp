@@ -420,7 +420,7 @@ namespace acsr {
             }
             for(int i=backward_grid.getNumPoints()-1;i>=0;--i){
                 t+=_dynamic_system->getStepSize();
-                if(maxDistance(backward_grid.getVector(i),current_state)>25e-6){
+                if(maxDistance(backward_grid.getVector(i),current_state)>SystemConfig::max_distance){
                     current_state = backward_grid.getVector(i);
                     forward_grid.addVector(current_state*1e6, forward_grid.getLastTime() + t);
                     t = 0.0;

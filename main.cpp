@@ -2,6 +2,8 @@
 #include "run_planner.hpp"
 #include "global_path.hpp"
 
+//#define _USE_CASADI_
+
 using namespace acsr;
 
 
